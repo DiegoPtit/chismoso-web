@@ -158,7 +158,7 @@ $this->title = 'Chismoso App';
             ]); ?>
                 <div class="card mb-3">
                     <div class="card-header d-flex justify-content-between align-items-center" style="background-color: <?= $headerFooterColor ?>; color: #000;">
-                        <span><?= Html::encode('@' . $post->usuario->id) ?></span>
+                        <span><?= Html::encode('@' . $post->id) ?></span>
                         <span><?= Yii::$app->formatter->asDatetime($post->created_at) ?></span>
                         <span>
                             <i class="fa <?= $icon ?> me-2"></i>

@@ -25,7 +25,7 @@ switch ($comentario->genre) {
 <!-- Contenedor del comentario -->
 <div class="card mb-3 subcomments" id="comentario-<?= $comentario->id ?>">
     <div class="card-header d-flex justify-content-between align-items-center" style="background-color: <?= $headerFooterColor ?>; color: #000;">
-        <span><?= Html::encode('@' . $comentario->usuario->id) ?></span>
+        <span><?= Html::encode('@' . $comentario->id) ?></span>
         <span><?= Yii::$app->formatter->asDatetime($comentario->created_at) ?></span>
         <span>
             <i class="fa <?= $icon ?> me-2"></i>
@@ -83,12 +83,44 @@ switch ($comentario->genre) {
                 'action' => ['/site/comment', 'post_id' => $comentario->id, 'modal' => $comentario->padre_id],
                 'options' => ['class' => 'd-flex flex-column gap-3']
             ]); ?>
-            <?= $form->field($modelComentario, 'contenido', ['inputOptions' => ['class' => 'form-control', 'rows' => 3, 'maxlength' => 480]])->textarea()->label(false) ?>
-            <div class="d-flex justify-content-end">
-                <button type="submit" class="btn btn-primary">
-                    <i class="fa fa-paper-plane me-2"></i> Publicar respuesta
-                </button>
-            </div>
+            <div class="row g-3">
+                    <div class="col-md-3">
+                        <?= $form->field($modelComentario, 'age', [
+                            'inputOptions' => [
+                                'type' => 'number',
+                                'min' => 1,
+                                'max' => 120,
+                                'class' => 'form-control',
+                                'placeholder' => 'Tu edad',
+                                'required' => true,
+                            ]
+                        ])->label(false) ?>
+                    </div>
+                    <div class="col-md-9">
+                        <?= $form->field($modelComentario, 'genre')->dropDownList([
+                            0 => 'Prefiero no decir',
+                            1 => 'Hombre',
+                            2 => 'Mujer'
+                        ], [
+                            'class' => 'form-select',
+                            'prompt' => 'Selecciona tu género',
+                            'required' => true,
+                        ])->label(false) ?>
+                    </div>
+                </div>
+                <?= $form->field($modelComentario, 'contenido', [
+                    'inputOptions' => [
+                        'placeholder' => 'Escribe tu respuesta...',
+                        'class' => 'form-control',
+                        'rows' => 3,
+                        'maxlength' => 480
+                    ]
+                ])->textarea()->label(false) ?>
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa fa-paper-plane me-2"></i> Publicar respuesta
+                    </button>
+                </div>
             <?php ActiveForm::end(); ?>
         </div>
     </div>

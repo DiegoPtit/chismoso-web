@@ -214,14 +214,12 @@ public function actionDislike($id)
             return $this->redirect(['reportar', 'post_id' => $post_id]);
         }
 
-        // Asegurarse de que el usuario esté autenticado
         if (Yii::$app->user->isGuest) {
             Yii::$app->session->setFlash('error', 'Debes iniciar sesión para reportar.');
             return $this->redirect(['site/login']);
         }
 
-        // Verificar si ya existe un reporte de este post por este usuario
-        $existing = \app\models\ReportedPosts::find()
+        $existing = ReportedPosts::find()
             ->where(['post_id' => $post_id, 'reporter_id' => Yii::$app->user->id])
             ->one();
 
@@ -230,7 +228,7 @@ public function actionDislike($id)
             return $this->redirect(['index']);
         }
 
-        $model = new \app\models\ReportedPosts();
+        $model = new ReportedPosts();
         $model->post_id = $post_id;
         $model->motivo = $motivo;
         $model->reporter_id = Yii::$app->user->id;
@@ -239,60 +237,155 @@ public function actionDislike($id)
             Yii::$app->session->setFlash('success', 'Reporte enviado exitosamente.');
         } else {
             Yii::$app->session->setFlash('error', 'Error al enviar el reporte.');
+            return $this->redirect(['index']);
+        }
+
+        // Contar reportes totales para el post
+        $reportCount = ReportedPosts::find()->where(['post_id' => $post_id])->count();
+
+        if ($reportCount >= 10) {
+            // Obtener motivo más frecuente
+            $motivos = ReportedPosts::find()
+                ->select(['motivo', 'COUNT(*) as count'])
+                ->where(['post_id' => $post_id])
+                ->groupBy('motivo')
+                ->orderBy(['count' => SORT_DESC])
+                ->asArray()
+                ->all();
+
+            $motivoMasFrecuente = $motivos[0]['motivo'] ?? 'Contenido inapropiado';
+            
+            // Diccionario de razones para el mensaje
+            $motivosTexto = [
+                'HATE_LANG' => 'Lenguaje que incita al odio',
+                'KIDS_HASSARAMENT' => 'Pedofilia',
+                'SENSIBLE_CONTENT' => 'Contenido inapropiado',
+                'SCAM' => 'Estafa',
+                'SPAM' => 'Spam',
+                'RACIST_LANG' => 'Racismo o Xenofobia',
+            ];
+
+            $motivoTexto = $motivosTexto[$motivoMasFrecuente] ?? 'Contenido inapropiado';
+
+            // Actualizar el post
+            $post = Posts::findOne($post_id);
+            if ($post) {
+                $post->contenido = "Este mensaje ha sido reportado por la comunidad por: $motivoTexto";
+                $post->save();
+            }
         }
     }
     return $this->redirect(['index']);
 }
+
+
+public function actionLoadMore($offset)
+{
+    Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+    
+    $posts = Posts::find()
+        ->orderBy(['created_at' => SORT_DESC])
+        ->offset($offset)
+        ->limit(20)
+        ->all();
+
+    if (empty($posts)) {
+        return ['success' => false, 'message' => 'No hay más posts disponibles.'];
+    }
+
+    $html = '';
+    foreach ($posts as $post) {
+        $html .= $this->renderPartial('_post', ['post' => $post]);
+    }
+
+    return ['success' => true, 'html' => $html];
+}
+
+
 
 
 public function actionCreateReportedUsers()
 {
     $request = Yii::$app->request;
-    if ($request->isPost) {
-        $usuario_id = $request->post('usuario_id');
-
-        if (!$usuario_id) {
-            Yii::$app->session->setFlash('error', 'Faltan datos para reportar el usuario.');
-            return $this->redirect(['reportar', 'usuario_id' => $usuario_id]);
-        }
-
-        // Asegurarse de que el usuario esté autenticado
-        if (Yii::$app->user->isGuest) {
-            Yii::$app->session->setFlash('error', 'Debes iniciar sesión para reportar.');
-            return $this->redirect(['site/login']);
-        }
-
-        $currentUserId = Yii::$app->user->id;
-
-        // Evitar que el usuario se reporte a sí mismo
-        if ($usuario_id == $currentUserId) {
-            Yii::$app->session->setFlash('error', 'No puedes reportarte a ti mismo.');
-            return $this->redirect(['index']);
-        }
-
-        // Verificar si ya existe un reporte de este usuario por el mismo reportero
-        $existing = \app\models\ReportedUsers::find()
-            ->where(['usuario_id' => $usuario_id, 'reporter_id' => $currentUserId])
-            ->one();
-
-        if ($existing !== null) {
-            Yii::$app->session->setFlash('error', 'Ya has reportado a este usuario.');
-            return $this->redirect(['index']);
-        }
-
-        $model = new \app\models\ReportedUsers();
-        $model->usuario_id = $usuario_id;
-        $model->reporter_id = $currentUserId;
-
-        if ($model->save()) {
-            Yii::$app->session->setFlash('success', 'Reporte del usuario enviado exitosamente.');
-        } else {
-            Yii::$app->session->setFlash('error', 'Error al enviar el reporte del usuario.');
+    
+    // 1. Verificar si la solicitud es POST
+    if (!$request->isPost) {
+        Yii::$app->session->setFlash('error', 'Método no permitido.');
+        return $this->redirect(['index']);
+    }
+    
+    // 2. Obtener usuario_id desde el formulario
+    $usuario_id = $request->post('usuario_id');
+    if (!$usuario_id) {
+        Yii::$app->session->setFlash('error', 'Faltan datos para reportar el usuario.');
+        return $this->redirect(['reportar']);
+    }
+    
+    // 3. Verificar si el usuario ha iniciado sesión
+    if (Yii::$app->user->isGuest) {
+        Yii::$app->session->setFlash('error', 'Debes iniciar sesión para reportar.');
+        return $this->redirect(['site/login']);
+    }
+    
+    $currentUserId = Yii::$app->user->id;
+    
+    // 4. Evitar que el usuario se reporte a sí mismo
+    if ($usuario_id == $currentUserId) {
+        Yii::$app->session->setFlash('error', 'No puedes reportarte a ti mismo.');
+        return $this->redirect(['index']);
+    }
+    
+    // 5. Verificar si ya existe un reporte previo del mismo usuario
+    $existingReport = \app\models\ReportedUsers::find()
+        ->where(['usuario_id' => $usuario_id, 'reporter_id' => $currentUserId])
+        ->exists();
+    
+    if ($existingReport) {
+        Yii::$app->session->setFlash('error', 'Ya has reportado a este usuario.');
+        return $this->redirect(['index']);
+    }
+    
+    // 6. Guardar el nuevo reporte en ReportedUsers
+    $reportedUser = new \app\models\ReportedUsers();
+    $reportedUser->usuario_id = $usuario_id;
+    $reportedUser->reporter_id = $currentUserId;
+    
+    if (!$reportedUser->save()) {
+        Yii::$app->session->setFlash('error', 'Error al guardar el reporte.');
+        Yii::error("Error al guardar reporte: " . print_r($reportedUser->errors, true));
+        return $this->redirect(['index']);
+    }
+    
+    Yii::$app->session->setFlash('success', 'Reporte enviado correctamente.');
+    
+    // 7. Contar cuántos reportes tiene el usuario reportado
+    $reportCount = \app\models\ReportedUsers::find()
+        ->where(['usuario_id' => $usuario_id])
+        ->count();
+    
+    Yii::debug("El usuario $usuario_id ha sido reportado $reportCount veces.");
+    
+    // 8. Si el usuario tiene más de 10 reportes, añadirlo a BannedUsuarios
+    if ($reportCount >= 10) {
+        $alreadyBanned = \app\models\BannedUsuarios::find()
+            ->where(['usuario_id' => $usuario_id])
+            ->exists();
+        
+        if (!$alreadyBanned) {
+            $bannedUser = new \app\models\BannedUsuarios();
+            $bannedUser->usuario_id = $usuario_id;
+            $bannedUser->at_time = new \yii\db\Expression('NOW()'); // Asigna la fecha actual automáticamente
+            
+            if (!$bannedUser->save()) {
+                Yii::error("Error al banear usuario: " . print_r($bannedUser->errors, true));
+            } else {
+                //Correcto
+            }
         }
     }
+    
     return $this->redirect(['index']);
 }
-
 
 
     public function actionComments($post_id)
