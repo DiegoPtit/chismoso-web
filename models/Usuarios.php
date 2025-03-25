@@ -95,6 +95,7 @@ class Usuarios extends \yii\db\ActiveRecord implements IdentityInterface
             [['birthday', 'created_at'], 'safe'],
             [['user'], 'string', 'max' => 180],
             [['auth_key'], 'string', 'max' => 32],
+            [['rol_id'], 'integer'],
         ];
     }
 
@@ -105,9 +106,9 @@ class Usuarios extends \yii\db\ActiveRecord implements IdentityInterface
     {
         return [
             'id' => Yii::t('app', 'ID'),
-            'user' => Yii::t('app', 'User'),
-            'pwd' => Yii::t('app', 'Pwd'),
-            'birthday' => Yii::t('app', 'Birthday'),
+            'user' => Yii::t('app', 'Usuario'),
+            'pwd' => Yii::t('app', 'Contraseña'),
+            'birthday' => Yii::t('app', 'Fecha de Nacimiento'),
             'created_at' => Yii::t('app', 'Created At'),
         ];
     }
