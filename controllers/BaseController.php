@@ -31,7 +31,7 @@ class BaseController extends Controller
         $log->ip = $ip;
 
         //Obtener el id del usuario
-        $log->usuario_id = !Yii::$app->user->isGuest ? Yii::$app->user->id : 0;
+        $log->usuario_id = !Yii::$app->user->isGuest ? Yii::$app->user->id : null;
 
         // Obtener la ubicación a partir de una API externa
         $log->ubicacion = $this->getLocationFromApi($ip);
