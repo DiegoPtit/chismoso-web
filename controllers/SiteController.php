@@ -145,38 +145,48 @@ public function actionDislike($id)
     return $this->redirect(['index', 'modal' => $modalId]);
 }
 
-public function actionComment($post_id)
-{
-    if (Yii::$app->user->isGuest) {
-        Yii::$app->session->setFlash('error', 'Debes estar registrado para comentar');
-        return $this->redirect(['site/login']);
-    }
-
-    $model = new Posts();
-    $model->usuario_id = Yii::$app->user->id;
-    $model->padre_id = $post_id;
-
-    if ($model->load(Yii::$app->request->post()) && $model->save()) {
-        // Obtener el post original (raíz de la conversación)
-        $currentPost = Posts::findOne($post_id);
-        while ($currentPost->padre_id !== null) {
-            $currentPost = $currentPost->padre;
-        }
-        
-        // Crear notificación solo si el receptor no es el mismo que el comentarista
-        if ($currentPost->usuario_id != Yii::$app->user->id) {
-            $notificacion = new Notificaciones();
-            $notificacion->receptor_id = $currentPost->usuario_id;
-            $notificacion->post_original_id = $currentPost->id;
-            $notificacion->comentario_id = $model->id;
-            $notificacion->save();
+    public function actionComment($post_id)
+    {
+        if (Yii::$app->user->isGuest) {
+            Yii::$app->session->setFlash('error', 'Debes estar registrado para comentar');
+            return $this->redirect(['site/login']);
         }
 
-        return $this->redirect(['index', 'modal' => $currentPost->id]);
-    }
+        $model = new Posts();
+        $model->usuario_id = Yii::$app->user->id;
+        $model->padre_id = $post_id;
 
-    return $this->redirect(['index']);
-}
+        if ($model->load(Yii::$app->request->post()) && $model->save()) {
+            // Obtener el post original (raíz de la conversación)
+            $originalPost = Posts::findOne($post_id);
+            while ($originalPost->padre_id !== null) {
+                $originalPost = $originalPost->padre;
+            }
+
+            // Notificar a cada autor en la cadena de comentarios (padres)
+            $notified = [];
+            $currentParent = Posts::findOne($post_id);
+            while ($currentParent) {
+                if ($currentParent->usuario_id != Yii::$app->user->id && !in_array($currentParent->usuario_id, $notified)) {
+                    $notificacion = new Notificaciones();
+                    $notificacion->receptor_id = $currentParent->usuario_id;
+                    $notificacion->post_original_id = $originalPost->id;
+                    $notificacion->comentario_id = $model->id;
+                    $notificacion->save();
+                    $notified[] = $currentParent->usuario_id;
+                }
+                if ($currentParent->padre_id) {
+                    $currentParent = Posts::findOne($currentParent->padre_id);
+                } else {
+                    break;
+                }
+            }
+
+            return $this->redirect(['index', 'modal' => $originalPost->id]);
+        }
+
+        return $this->redirect(['index']);
+    }
 
 
 
