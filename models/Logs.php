@@ -35,6 +35,7 @@ class Logs extends \yii\db\ActiveRecord
         return [
             [['ip', 'ubicacion', 'accion', 'status', 'osver', 'useragent'], 'required'],
             [['status'], 'integer'],
+            [['usuario_id'], 'integer'],
             [['ip', 'ubicacion', 'accion', 'osver'], 'string', 'max' => 120],
             [['useragent'], 'string', 'max' => 455],
             [['fecha_hora'], 'safe'],
@@ -50,6 +51,7 @@ class Logs extends \yii\db\ActiveRecord
             'id' => Yii::t('app', 'ID'),
             'ip' => Yii::t('app', 'Ip'),
             'ubicacion' => Yii::t('app', 'Ubicacion'),
+            'usuario_id' => Yii::t('app', 'ID del Usuario'),
             'accion' => Yii::t('app', 'Accion'),
             'status' => Yii::t('app', 'Status'),
             'osver' => Yii::t('app', 'Osver'),
