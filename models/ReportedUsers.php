@@ -5,14 +5,13 @@ namespace app\models;
 use Yii;
 
 /**
- * This is the model class for table "reported_posts".
+ * This is the model class for table "reported_users".
  *
  * @property int $id
- * @property int $post_id
- * @property int $count
- * @property string $motivo
+ * @property int $usuario_id
+ * @property string $at_time
  */
-class ReportedPosts extends \yii\db\ActiveRecord
+class ReportedUsers extends \yii\db\ActiveRecord
 {
 
 
@@ -21,7 +20,7 @@ class ReportedPosts extends \yii\db\ActiveRecord
      */
     public static function tableName()
     {
-        return 'reported_posts';
+        return 'reported_users';
     }
 
     /**
@@ -30,11 +29,10 @@ class ReportedPosts extends \yii\db\ActiveRecord
     public function rules()
     {
         return [
-            [['post_id', 'motivo'], 'required'],
-            [['post_id'], 'integer'],
+            [['usuario_id'], 'required'],
+            [['usuario_id'], 'integer'],
             [['reporter_id'], 'integer'],
             [['at_time'], 'safe'],
-            [['motivo'], 'string', 'max' => 480],
         ];
     }
 
@@ -45,9 +43,8 @@ class ReportedPosts extends \yii\db\ActiveRecord
     {
         return [
             'id' => Yii::t('app', 'ID'),
-            'post_id' => Yii::t('app', 'Post ID'),
-            'count' => Yii::t('app', 'Count'),
-            'motivo' => Yii::t('app', 'Motivo'),
+            'usuario_id' => Yii::t('app', 'Usuario ID'),
+            'at_time' => Yii::t('app', 'At Time'),
         ];
     }
 

@@ -7,8 +7,48 @@ use yii\helpers\Html;
 use yii\bootstrap5\Modal;
 use yii\widgets\ActiveForm;
 
-$this->title = 'Chismoso App';
+// Verificar si hay algún mensaje flash
+$flashTypes = ['success', 'error', 'warning', 'info'];
+foreach ($flashTypes as $type) {
+    if (Yii::$app->session->hasFlash($type)) {
+        $message = Yii::$app->session->getFlash($type);
+        $modalType = match ($type) {
+            'success' => 'bg-success text-white',
+            'error' => 'bg-danger text-white',
+            'warning' => 'bg-warning text-dark',
+            'info' => 'bg-info text-dark',
+        };
 
+        Modal::begin([
+            'id' => 'flashMessageModal',
+            'title' => match ($type) {
+                'success' => '¡Exito!',
+                'error' => '¡Ha ocurrido un error!',
+                'warning' => '¡Advertencia!',
+                'info' => 'Información',
+            },
+            'options' => ['class' => 'fade'],
+            'headerOptions' => ['class' => $modalType],
+        ]);
+
+        echo "<p>{$message}</p>";
+
+        echo Html::button('Cerrar', [
+            'class' => 'btn btn-secondary',
+            'data-bs-dismiss' => 'modal'
+        ]);
+
+        Modal::end();
+
+        $this->registerJs(<<<JS
+            var flashModal = new bootstrap.Modal(document.getElementById('flashMessageModal'));
+            flashModal.show();
+        JS);
+        break; // Solo mostrar un mensaje a la vez
+    }
+}
+
+$this->title = 'Chismoso App';
 ?>
 <div class="site-index">
     <?php if (empty($posts)): ?>
@@ -22,16 +62,20 @@ $this->title = 'Chismoso App';
                 padding-left: 1.5rem;
                 margin-left: 1rem;
             }
-
             /* En tu archivo CSS principal */
             .btn-flotante {
                 box-shadow: 0 5px 15px rgba(0,0,0,0.3);
                 transition: all 0.3s ease;
             }
-
             .btn-flotante:hover {
                 transform: scale(1.1);
                 box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            }
+            /* Estilo para iconos de reporte */
+            .icono-reporte {
+                cursor: pointer;
+                color: #d9534f; /* Rojo Bootstrap */
+                margin-right: 10px;
             }
         </style>
 
@@ -59,7 +103,7 @@ $this->title = 'Chismoso App';
             <!-- Tarjeta del post principal -->
             <div class="card mb-3">
                 <div class="card-header d-flex justify-content-between align-items-center" style="background-color: <?= $headerFooterColor ?>; color: #000;">
-                    <span><?= Html::encode('@' . $post->usuario->id) ?></span>
+                    <span><?= Html::encode('@' . $post->id) ?></span>
                     <span><?= Yii::$app->formatter->asDatetime($post->created_at) ?></span>
                     <span>
                         <i class="fa <?= $icon ?> me-2"></i> <!-- Ícono según el género -->
@@ -86,11 +130,22 @@ $this->title = 'Chismoso App';
                         <?= Html::endForm() ?>
 
                         <!-- Botón para abrir modal de comentarios -->
-                        <?= Html::a('<i class="fa fa-comment"></i>', '#', [
-                            'class' => 'text-dark',
+                        <?= Html::a('<i class="fa fa-comment" style="margin-right: 10px;"></i>', '#', [
+                            'class' => 'text-dark me-3',
                             'data-bs-toggle' => 'modal',
                             'data-bs-target' => '#commentModal' . $post->id,
                         ]) ?>
+
+                        <span>
+                            <?= Html::a('<i class="fa fa-flag"></i> <strong style="margin-right: 10px;">Reportar Chisme</strong>', ['site/reportar', 'post_id' => $post->id], [
+                                'class' => 'icono-reporte',
+                                'title' => 'Reportar Chisme',
+                            ]) ?>
+                            <?= Html::a('<i class="fa fa-user-times"></i> <strong style="margin-right: 10px;">Reportar Usuario</strong>', ['site/reportar', 'usuario_id' => $post->usuario->id], [
+                                'class' => 'icono-reporte',
+                                'title' => 'Reportar Usuario',
+                            ]) ?>
+                        </span>
                     </div>
                 </div>
             </div>
@@ -126,17 +181,28 @@ $this->title = 'Chismoso App';
                                     <i class="fa fa-thumbs-down"></i> <strong><?= $post->dislikes ?></strong>
                                 </button>
                             <?= Html::endForm() ?>
+
+                            <span>
+                                <?= Html::a('<i class="fa fa-flag"></i> <strong style="margin-right: 10px;">Reportar Chisme</strong>', ['site/reportar', 'post_id' => $post->id], [
+                                    'class' => 'icono-reporte',
+                                    'title' => 'Reportar Chisme',
+                                ]) ?>
+                                <?= Html::a('<i class="fa fa-user-times"></i> <strong style="margin-right: 10px;">Reportar Usuario</strong>', ['site/reportar', 'usuario_id' => $post->usuario->id], [
+                                    'class' => 'icono-reporte',
+                                    'title' => 'Reportar Usuario',
+                                ]) ?>
+                            </span>
                         </div>
                     </div>
                 </div>
                 <hr>
                 <!-- Formulario para comentar el post -->
                 <?php $form = ActiveForm::begin([
-                    'action' => ['/site/comment', 'post_id' => $post->id, 'modal' => $post->id], // ← Pasamos el modal
+                    'action' => ['/site/comment', 'post_id' => $post->id, 'modal' => $post->id],
                     'options' => ['class' => 'd-flex flex-column gap-3']
                 ]); ?>
 
-<div class="row g-3">
+                <div class="row g-3">
                     <div class="col-md-3">
                         <?= $form->field($modelComentario, 'age', [
                             'inputOptions' => [
@@ -191,15 +257,14 @@ $this->title = 'Chismoso App';
         <?php endforeach; ?>
     <?php endif; ?>
 
-    <?php echo Html::a(
-    '<i class="fa fa-paper-plane"></i>',
-    ['/site/create-post'],
-    [
-        'class' => 'btn btn-primary btn-lg rounded-circle position-fixed btn-flotante',
-        'style' => 'bottom: 20px; right: 20px; z-index: 1000;'
-    ]
-);
-?>
+    <?= Html::a(
+        '<i class="fa fa-paper-plane"></i>',
+        ['/site/create-post'],
+        [
+            'class' => 'btn btn-primary btn-lg rounded-circle position-fixed btn-flotante',
+            'style' => 'bottom: 20px; right: 20px; z-index: 1000;'
+        ]
+    ); ?>
 </div>
 
 <?php
@@ -213,7 +278,6 @@ if ($modalId) {
                 window.location.href = window.location.pathname;
             });
         });
-
         var modal = new bootstrap.Modal(document.getElementById('commentModal{$modalId}'));
         modal.show();
     ");
@@ -222,4 +286,3 @@ if ($modalId) {
 
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9977380373858586"
      crossorigin="anonymous"></script>
-

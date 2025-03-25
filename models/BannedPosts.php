@@ -5,14 +5,14 @@ namespace app\models;
 use Yii;
 
 /**
- * This is the model class for table "reported_posts".
+ * This is the model class for table "banned_posts".
  *
  * @property int $id
  * @property int $post_id
- * @property int $count
  * @property string $motivo
+ * @property string $at_time
  */
-class ReportedPosts extends \yii\db\ActiveRecord
+class BannedPosts extends \yii\db\ActiveRecord
 {
 
 
@@ -21,7 +21,7 @@ class ReportedPosts extends \yii\db\ActiveRecord
      */
     public static function tableName()
     {
-        return 'reported_posts';
+        return 'banned_posts';
     }
 
     /**
@@ -32,9 +32,8 @@ class ReportedPosts extends \yii\db\ActiveRecord
         return [
             [['post_id', 'motivo'], 'required'],
             [['post_id'], 'integer'],
-            [['reporter_id'], 'integer'],
             [['at_time'], 'safe'],
-            [['motivo'], 'string', 'max' => 480],
+            [['motivo'], 'string', 'max' => 255],
         ];
     }
 
@@ -46,8 +45,8 @@ class ReportedPosts extends \yii\db\ActiveRecord
         return [
             'id' => Yii::t('app', 'ID'),
             'post_id' => Yii::t('app', 'Post ID'),
-            'count' => Yii::t('app', 'Count'),
             'motivo' => Yii::t('app', 'Motivo'),
+            'at_time' => Yii::t('app', 'At Time'),
         ];
     }
 

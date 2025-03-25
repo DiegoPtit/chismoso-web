@@ -12,6 +12,8 @@ use app\models\ContactForm;
 use app\models\Posts;
 use app\models\Usuarios;
 use app\models\Notificaciones;
+use app\models\ReportedPosts;
+use app\models\ReportedUsers;
 
 class SiteController extends BaseController
 {
@@ -187,6 +189,109 @@ public function actionDislike($id)
 
         return $this->redirect(['index']);
     }
+
+    public function actionReportar($post_id = null, $usuario_id = null)
+    {
+        return $this->render('reportar', [
+            'post_id' => $post_id,
+            'usuario_id' => $usuario_id,
+        ]);
+    }
+
+    /**
+     * Acción para procesar el reporte de un post/comentario.
+     * Se espera recibir por POST: post_id y motivo.
+     */
+    public function actionCreateReportedPosts()
+{
+    $request = Yii::$app->request;
+    if ($request->isPost) {
+        $post_id = $request->post('post_id');
+        $motivo = $request->post('motivo');
+
+        if (!$post_id || !$motivo) {
+            Yii::$app->session->setFlash('error', 'Faltan datos para reportar el post.');
+            return $this->redirect(['reportar', 'post_id' => $post_id]);
+        }
+
+        // Asegurarse de que el usuario esté autenticado
+        if (Yii::$app->user->isGuest) {
+            Yii::$app->session->setFlash('error', 'Debes iniciar sesión para reportar.');
+            return $this->redirect(['site/login']);
+        }
+
+        // Verificar si ya existe un reporte de este post por este usuario
+        $existing = \app\models\ReportedPosts::find()
+            ->where(['post_id' => $post_id, 'reporter_id' => Yii::$app->user->id])
+            ->one();
+
+        if ($existing !== null) {
+            Yii::$app->session->setFlash('error', 'Ya has reportado este post.');
+            return $this->redirect(['index']);
+        }
+
+        $model = new \app\models\ReportedPosts();
+        $model->post_id = $post_id;
+        $model->motivo = $motivo;
+        $model->reporter_id = Yii::$app->user->id;
+
+        if ($model->save()) {
+            Yii::$app->session->setFlash('success', 'Reporte enviado exitosamente.');
+        } else {
+            Yii::$app->session->setFlash('error', 'Error al enviar el reporte.');
+        }
+    }
+    return $this->redirect(['index']);
+}
+
+
+public function actionCreateReportedUsers()
+{
+    $request = Yii::$app->request;
+    if ($request->isPost) {
+        $usuario_id = $request->post('usuario_id');
+
+        if (!$usuario_id) {
+            Yii::$app->session->setFlash('error', 'Faltan datos para reportar el usuario.');
+            return $this->redirect(['reportar', 'usuario_id' => $usuario_id]);
+        }
+
+        // Asegurarse de que el usuario esté autenticado
+        if (Yii::$app->user->isGuest) {
+            Yii::$app->session->setFlash('error', 'Debes iniciar sesión para reportar.');
+            return $this->redirect(['site/login']);
+        }
+
+        $currentUserId = Yii::$app->user->id;
+
+        // Evitar que el usuario se reporte a sí mismo
+        if ($usuario_id == $currentUserId) {
+            Yii::$app->session->setFlash('error', 'No puedes reportarte a ti mismo.');
+            return $this->redirect(['index']);
+        }
+
+        // Verificar si ya existe un reporte de este usuario por el mismo reportero
+        $existing = \app\models\ReportedUsers::find()
+            ->where(['usuario_id' => $usuario_id, 'reporter_id' => $currentUserId])
+            ->one();
+
+        if ($existing !== null) {
+            Yii::$app->session->setFlash('error', 'Ya has reportado a este usuario.');
+            return $this->redirect(['index']);
+        }
+
+        $model = new \app\models\ReportedUsers();
+        $model->usuario_id = $usuario_id;
+        $model->reporter_id = $currentUserId;
+
+        if ($model->save()) {
+            Yii::$app->session->setFlash('success', 'Reporte del usuario enviado exitosamente.');
+        } else {
+            Yii::$app->session->setFlash('error', 'Error al enviar el reporte del usuario.');
+        }
+    }
+    return $this->redirect(['index']);
+}
 
 
 
