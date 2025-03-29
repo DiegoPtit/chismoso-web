@@ -2,10 +2,196 @@
 /* @var $this yii\web\View */
 /* @var $posts app\models\Posts[] */
 /* @var $modelComentario app\models\Posts */
+/* @var $perPage int */
+/* @var $totalPosts int */
 
 use yii\helpers\Html;
 use yii\bootstrap5\Modal;
 use yii\widgets\ActiveForm;
+
+$this->title = 'Chismoso App';
+
+// Registrar estilos CSS
+$this->registerCss(<<<CSS
+    .site-index {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+    .subcomments {
+        border-left: 3px solid #e9ecef;
+        padding-left: 1.5rem;
+        margin-left: 1rem;
+        border-radius: 0 4px 4px 0;
+    }
+    .btn-flotante {
+        background: linear-gradient(45deg, #4a90e2, #67b26f);
+        border: none;
+        width: 60px;
+        height: 60px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+    }
+    .btn-flotante:hover {
+        transform: translateY(-5px) scale(1.05);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    }
+    .icono-reporte {
+        cursor: pointer;
+        color: #d9534f;
+        margin-right: 10px;
+        transition: transform 0.2s ease;
+    }
+    .icono-reporte:hover {
+        transform: scale(1.1);
+    }
+    .post-card {
+        transition: all 0.3s ease;
+        border: none;
+        border-radius: 24px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        margin-bottom: 2rem;
+        background: #ffffff;
+        overflow: hidden;
+    }
+    .post-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 30px rgba(0,0,0,0.1);
+    }
+    .post-card .card-body {
+        padding: 2rem;
+    }
+    @media (min-width: 768px) {
+        .post-card {
+            margin: 0 1rem 2rem 1rem;
+        }
+        .post-card .card-body {
+            padding: 2.5rem;
+        }
+    }
+    .post-card .card-header {
+        background: transparent;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        padding: 1.5rem 2rem;
+    }
+    .post-card .card-footer {
+        background: transparent;
+        border-top: 1px solid rgba(0,0,0,0.05);
+        padding: 1.5rem 2rem;
+    }
+    .comments-container {
+        max-height: 500px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: #4a90e2 #f3f3f3;
+        padding: 0 0.5rem;
+    }
+    .comments-container::-webkit-scrollbar {
+        width: 6px;
+    }
+    .comments-container::-webkit-scrollbar-track {
+        background: #f3f3f3;
+        border-radius: 3px;
+    }
+    .comments-container::-webkit-scrollbar-thumb {
+        background: #4a90e2;
+        border-radius: 3px;
+    }
+    #loading-spinner {
+        display: none;
+        text-align: center;
+        padding: 2rem;
+    }
+    .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #4a90e2;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: #f8f9fa;
+        border-radius: 24px;
+        margin: 2rem 0;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    }
+    .empty-state i {
+        font-size: 3rem;
+        color: #6c757d;
+        margin-bottom: 1rem;
+    }
+    .empty-state p {
+        color: #6c757d;
+        font-size: 1.1rem;
+    }
+    .modal-content {
+        border-radius: 24px;
+        border: none;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    }
+    .modal-header {
+        border-bottom: 1px solid #e9ecef;
+        padding: 1.5rem 2rem;
+    }
+    .modal-body {
+        padding: 2rem;
+    }
+    .modal-footer {
+        border-top: 1px solid #e9ecef;
+        padding: 1.5rem 2rem;
+    }
+
+    /* Estilos responsivos para móviles */
+    @media (max-width: 767px) {
+        .site-index {
+            padding: 1rem;
+        }
+        .post-card {
+            border-radius: 16px;
+            margin-bottom: 1rem;
+        }
+        .post-card .card-body {
+            padding: 1rem;
+        }
+        .post-card .card-header {
+            padding: 1rem;
+        }
+        .post-card .card-footer {
+            padding: 1rem;
+        }
+        .btn-label {
+            display: none;
+        }
+        .btn i {
+            margin-right: 0 !important;
+        }
+        .btn {
+            padding: 0.5rem 0.75rem;
+        }
+        .btn-lg {
+            padding: 0.75rem 1rem;
+        }
+        .empty-state {
+            padding: 2rem 1rem;
+            border-radius: 16px;
+        }
+        .empty-state i {
+            font-size: 2.5rem;
+        }
+        .empty-state p {
+            font-size: 1rem;
+        }
+    }
+CSS
+);
 
 // Verificar si hay algún mensaje flash
 $flashTypes = ['success', 'error', 'warning', 'info'];
@@ -32,7 +218,6 @@ foreach ($flashTypes as $type) {
         ]);
 
         echo "<p>{$message}</p>";
-
         echo Html::button('Cerrar', [
             'class' => 'btn btn-secondary',
             'data-bs-dismiss' => 'modal'
@@ -44,227 +229,41 @@ foreach ($flashTypes as $type) {
             var flashModal = new bootstrap.Modal(document.getElementById('flashMessageModal'));
             flashModal.show();
         JS);
-        break; // Solo mostrar un mensaje a la vez
+        break;
     }
 }
-
-$this->title = 'Chismoso App';
 ?>
+
 <div class="site-index">
     <?php if (empty($posts)): ?>
-        <p class="text-center mt-5">No hay posts disponibles, intente de nuevo.</p>
+        <div class="empty-state">
+            <i class="fa fa-comments"></i>
+            <p>No hay chismes disponibles en este momento.</p>
+            <p class="text-muted">¡Sé el primero en compartir un chisme!</p>
+        </div>
     <?php else: ?>
+        <div id="posts-container">
+            <?php foreach ($posts as $post): ?>
+                <?= $this->render('_post', [
+                    'post' => $post,
+                    'modelComentario' => $modelComentario
+                ]) ?>
+            <?php endforeach; ?>
+        </div>
 
-        <style>
-            /* Estilo para comentarios anidados */
-            .subcomments {
-                border-left: 3px solid #ddd;
-                padding-left: 1.5rem;
-                margin-left: 1rem;
-            }
-            /* En tu archivo CSS principal */
-            .btn-flotante {
-                box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-                transition: all 0.3s ease;
-            }
-            .btn-flotante:hover {
-                transform: scale(1.1);
-                box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-            }
-            /* Estilo para iconos de reporte */
-            .icono-reporte {
-                cursor: pointer;
-                color: #d9534f; /* Rojo Bootstrap */
-                margin-right: 10px;
-            }
-        </style>
+        <div id="loading-spinner">
+            <div class="loading-spinner"></div>
+        </div>
 
-        <?php foreach ($posts as $post): ?>
-            <?php
-                // Definir colores según el género del post
-                switch ($post->genre) {
-                    case 1:
-                        $headerFooterColor = "#aeb3ff";
-                        $bodyColor = "#e4e6ff";
-                        $icon = 'fa-male';  // Ícono para hombre
-                        break;
-                    case 2:
-                        $headerFooterColor = "#ffb3fa";
-                        $bodyColor = "#ffddfd";
-                        $icon = 'fa-female';  // Ícono para mujer
-                        break;
-                    default:
-                        $headerFooterColor = "#c2c2c2";
-                        $bodyColor = "#e5e5e5";
-                        $icon = 'fa-user-secret';  // Ícono para incognito
-                        break;
-                }
-            ?>
-            <!-- Tarjeta del post principal -->
-            <div class="card mb-3">
-                <div class="card-header d-flex justify-content-between align-items-center" style="background-color: <?= $headerFooterColor ?>; color: #000;">
-                    <span><?= Html::encode('@' . $post->id) ?></span>
-                    <span><?= Yii::$app->formatter->asDatetime($post->created_at) ?></span>
-                    <span>
-                        <i class="fa <?= $icon ?> me-2"></i> <!-- Ícono según el género -->
-                        <strong><?= $post->age ?> años</strong>
-                    </span>
-                </div>
-                <div class="card-body" style="background-color: <?= $bodyColor ?>;">
-                    <p><?= Html::encode($post->contenido) ?></p>
-                </div>
-                <div class="card-footer" style="background-color: <?= $headerFooterColor ?>; color: #000;">
-                    <div class="d-flex align-items-center">
-                        <!-- Formulario de Like -->
-                        <?= Html::beginForm(['/site/like', 'id' => $post->id], 'post') ?>
-                            <button type="submit" class="btn btn-link text-dark me-3">
-                                <i class="fa fa-thumbs-up"></i> <strong><?= $post->likes ?></strong>
-                            </button>
-                        <?= Html::endForm() ?>
-
-                        <!-- Formulario de Dislike -->
-                        <?= Html::beginForm(['/site/dislike', 'id' => $post->id], 'post') ?>
-                            <button type="submit" class="btn btn-link text-dark me-3">
-                                <i class="fa fa-thumbs-down"></i> <strong><?= $post->dislikes ?></strong>
-                            </button>
-                        <?= Html::endForm() ?>
-
-                        <!-- Botón para abrir modal de comentarios -->
-                        <?= Html::a('<i class="fa fa-comment" style="margin-right: 10px;"></i>', '#', [
-                            'class' => 'text-dark me-3',
-                            'data-bs-toggle' => 'modal',
-                            'data-bs-target' => '#commentModal' . $post->id,
-                        ]) ?>
-
-                        <span>
-                            <?= Html::a('<i class="fa fa-flag"></i> <strong style="margin-right: 10px;">Reportar Chisme</strong>', ['site/reportar', 'post_id' => $post->id], [
-                                'class' => 'icono-reporte',
-                                'title' => 'Reportar Chisme',
-                            ]) ?>
-                            <?= Html::a('<i class="fa fa-user-times"></i> <strong style="margin-right: 10px;">Reportar Usuario</strong>', ['site/reportar', 'usuario_id' => $post->usuario->id], [
-                                'class' => 'icono-reporte',
-                                'title' => 'Reportar Usuario',
-                            ]) ?>
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Modal de comentarios para el post -->
-            <?php Modal::begin([
-                'id' => 'commentModal' . $post->id,
-                'title' => 'Comentarios',
-                'size' => 'modal-lg',
-            ]); ?>
-                <div class="card mb-3">
-                    <div class="card-header d-flex justify-content-between align-items-center" style="background-color: <?= $headerFooterColor ?>; color: #000;">
-                        <span><?= Html::encode('@' . $post->id) ?></span>
-                        <span><?= Yii::$app->formatter->asDatetime($post->created_at) ?></span>
-                        <span>
-                            <i class="fa <?= $icon ?> me-2"></i>
-                            <strong><?= $post->age ?> años</strong>
-                        </span>
-                    </div>
-                    <div class="card-body" style="background-color: <?= $bodyColor ?>;">
-                        <p><?= Html::encode($post->contenido) ?></p>
-                    </div>
-                    <div class="card-footer" style="background-color: <?= $headerFooterColor ?>; color: #000;">
-                        <div class="d-flex align-items-center">
-                            <?= Html::beginForm(['/site/like', 'id' => $post->id, 'modal' => $post->id], 'post') ?>
-                                <button type="submit" class="btn btn-link text-dark me-3">
-                                    <i class="fa fa-thumbs-up"></i> <strong><?= $post->likes ?></strong>
-                                </button>
-                            <?= Html::endForm() ?>
-
-                            <?= Html::beginForm(['/site/dislike', 'id' => $post->id, 'modal' => $post->id], 'post') ?>
-                                <button type="submit" class="btn btn-link text-dark me-3">
-                                    <i class="fa fa-thumbs-down"></i> <strong><?= $post->dislikes ?></strong>
-                                </button>
-                            <?= Html::endForm() ?>
-
-                            <span>
-                                <?= Html::a('<i class="fa fa-flag"></i> <strong style="margin-right: 10px;">Reportar Chisme</strong>', ['site/reportar', 'post_id' => $post->id], [
-                                    'class' => 'icono-reporte',
-                                    'title' => 'Reportar Chisme',
-                                ]) ?>
-                                <?= Html::a('<i class="fa fa-user-times"></i> <strong style="margin-right: 10px;">Reportar Usuario</strong>', ['site/reportar', 'usuario_id' => $post->usuario->id], [
-                                    'class' => 'icono-reporte',
-                                    'title' => 'Reportar Usuario',
-                                ]) ?>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                <hr>
-                <!-- Formulario para comentar el post -->
-                <?php $form = ActiveForm::begin([
-                    'action' => ['/site/comment', 'post_id' => $post->id, 'modal' => $post->id],
-                    'options' => ['class' => 'd-flex flex-column gap-3']
-                ]); ?>
-
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <?= $form->field($modelComentario, 'age', [
-                            'inputOptions' => [
-                                'type' => 'number',
-                                'min' => 1,
-                                'max' => 120,
-                                'class' => 'form-control',
-                                'placeholder' => 'Tu edad',
-                                'required' => true,
-                            ]
-                        ])->label(false) ?>
-                    </div>
-                    <div class="col-md-9">
-                        <?= $form->field($modelComentario, 'genre')->dropDownList([
-                            0 => 'Prefiero no decir',
-                            1 => 'Hombre',
-                            2 => 'Mujer'
-                        ], [
-                            'class' => 'form-select',
-                            'prompt' => 'Selecciona tu género',
-                            'required' => true,
-                        ])->label(false) ?>
-                    </div>
-                </div>
-                <?= $form->field($modelComentario, 'contenido', [
-                    'inputOptions' => [
-                        'placeholder' => 'Escribe tu respuesta...',
-                        'class' => 'form-control',
-                        'rows' => 3,
-                        'maxlength' => 480
-                    ]
-                ])->textarea()->label(false) ?>
-                <div class="d-flex justify-content-end">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fa fa-paper-plane me-2"></i> Publicar respuesta
-                    </button>
-                </div>
-                <?php ActiveForm::end(); ?>
-
-                <br>
-
-                <!-- Renderizado recursivo de comentarios -->
-                <div id="comments-section-<?= $post->id ?>">
-                <?php foreach ($post->getSubcomentarios()->orderBy(['created_at' => SORT_DESC])->all() as $comentario): ?>
-                    <?= $this->render('_comentario', [
-                        'comentario' => $comentario,
-                        'modelComentario' => $modelComentario,
-                    ]) ?>
-                <?php endforeach; ?>
-            </div>
-            <?php Modal::end(); ?>
-        <?php endforeach; ?>
+        <?= Html::a(
+            '<i class="fa fa-plus"></i>',
+            ['/site/create-post'],
+            [
+                'class' => 'btn btn-primary btn-lg rounded-circle position-fixed btn-flotante d-flex align-items-center justify-content-center',
+                'style' => 'bottom: 30px; right: 30px; z-index: 1000;'
+            ]
+        ); ?>
     <?php endif; ?>
-
-    <?= Html::a(
-        '<i class="fa fa-paper-plane"></i>',
-        ['/site/create-post'],
-        [
-            'class' => 'btn btn-primary btn-lg rounded-circle position-fixed btn-flotante',
-            'style' => 'bottom: 20px; right: 20px; z-index: 1000;'
-        ]
-    ); ?>
 </div>
 
 <?php
@@ -273,16 +272,87 @@ $modalId = Yii::$app->request->get('modal');
 if ($modalId) {
     $this->registerJs("
         $(document).ready(function(){
-            $('#commentModal$modalId').modal('show');
+            var modal = new bootstrap.Modal(document.getElementById('commentModal$modalId'));
+            modal.show();
             $('#commentModal$modalId').on('hidden.bs.modal', function(){
                 window.location.href = window.location.pathname;
             });
         });
-        var modal = new bootstrap.Modal(document.getElementById('commentModal{$modalId}'));
-        modal.show();
     ");
 }
 ?>
 
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9977380373858586"
      crossorigin="anonymous"></script>
+
+<?php
+// Registrar scripts
+$this->registerJs(<<<JS
+    // Variables para el infinite scroll
+    let currentPage = 1;
+    let isLoading = false;
+    let hasMore = true;
+    const perPage = $perPage;
+    const totalPosts = $totalPosts;
+    const totalPages = Math.ceil(totalPosts / perPage);
+
+    // Manejo de likes y dislikes con AJAX
+    $(document).on('submit', '.like-form, .dislike-form', function(e) {
+        e.preventDefault();
+        var form = $(this);
+        var url = form.attr('action');
+        var isLike = form.hasClass('like-form');
+        var countElement = isLike ? form.find('.likes-count') : form.find('.dislikes-count');
+        
+        $.post(url, function(response) {
+            if (response.success) {
+                countElement.text(response.count);
+            } else {
+                alert(response.message || 'Error al procesar la solicitud');
+            }
+        }).fail(function() {
+            alert('Error al procesar la solicitud');
+        });
+    });
+
+    // Función para cargar más posts
+    function loadMorePosts() {
+        if (isLoading || !hasMore) return;
+        
+        isLoading = true;
+        $('#loading-spinner').show();
+        
+        $.get(window.location.pathname, {
+            page: currentPage + 1
+        })
+        .done(function(response) {
+            if (response.success) {
+                $('#posts-container').append(response.html);
+                currentPage++;
+                hasMore = response.hasMore;
+                
+                // Reinicializar los modales de Bootstrap para los nuevos posts
+                response.html.match(/id="commentModal\d+"/g).forEach(function(match) {
+                    const modalId = match.match(/\d+/)[0];
+                    new bootstrap.Modal(document.getElementById('commentModal' + modalId));
+                });
+            }
+        })
+        .fail(function() {
+            alert('Error al cargar más posts');
+        })
+        .always(function() {
+            isLoading = false;
+            $('#loading-spinner').hide();
+        });
+    }
+
+    // Detectar cuando el usuario llega al final de la página
+    $(window).scroll(function() {
+        if ($(window).scrollTop() + $(window).height() > $(document).height() - 100) {
+            loadMorePosts();
+        }
+    });
+JS
+);
+?>

@@ -60,4 +60,10 @@ class Logs extends \yii\db\ActiveRecord
         ];
     }
 
+    public function getUsuario()
+    {
+        return $this->hasOne(Usuarios::className(), ['id' => 'usuario_id']);
+    }
+
+
 }

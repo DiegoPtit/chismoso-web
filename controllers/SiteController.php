@@ -61,6 +61,19 @@ class SiteController extends BaseController
         ];
     }
 
+    public function actionError()
+{
+    $exception = Yii::$app->errorHandler->exception;
+
+    if ($exception !== null) {
+        if ($exception instanceof \yii\db\Exception) {
+            return $this->render('saturacion', ['exception' => $exception]);
+        }
+        return $this->render('error', ['exception' => $exception]);
+    }
+}
+
+
     /**
      * Displays homepage.
      *
@@ -68,19 +81,68 @@ class SiteController extends BaseController
      */
     public function actionIndex()
 {
-    $posts = Posts::find()
-        ->where(['padre_id' => null])
-        ->with(['usuario', 'posts.usuario'])
-        ->orderBy(['created_at' => SORT_DESC])
-        ->all();
+    try {
+        $page = Yii::$app->request->get('page', 1);
+        $perPage = 10; // Número de posts por página
+        
+        $query = Posts::find()
+            ->where(['padre_id' => null])
+            ->with([
+                'usuario',
+                'posts' => function($query) {
+                    $query->with(['usuario'])
+                          ->orderBy(['created_at' => SORT_DESC]);
+                }
+            ])
+            ->orderBy(['created_at' => SORT_DESC]);
 
-    // Crear nueva instancia del modelo para el formulario
-    $modelComentario = new Posts();
+        // Si es una solicitud AJAX, devolver solo los posts de la página solicitada
+        if (Yii::$app->request->isAjax) {
+            Yii::$app->response->format = Response::FORMAT_JSON;
+            
+            $totalPosts = $query->count();
+            $totalPages = ceil($totalPosts / $perPage);
+            
+            $posts = $query->offset(($page - 1) * $perPage)
+                          ->limit($perPage)
+                          ->all();
+            
+            $html = '';
+            foreach ($posts as $post) {
+                $html .= $this->renderPartial('_post', [
+                    'post' => $post,
+                    'modelComentario' => new Posts(),
+                ]);
+            }
+            
+            return [
+                'success' => true,
+                'html' => $html,
+                'hasMore' => $page < $totalPages,
+                'totalPages' => $totalPages
+            ];
+        }
 
-    return $this->render('index', [
-        'posts' => $posts,
-        'modelComentario' => $modelComentario, // Pasar el modelo a la vista
-    ]);
+        // Para la carga inicial, solo cargamos la primera página
+        $posts = $query->limit($perPage)->all();
+        $modelComentario = new Posts();
+
+        return $this->render('index', [
+            'posts' => $posts,
+            'modelComentario' => $modelComentario,
+            'perPage' => $perPage,
+            'totalPosts' => $query->count(),
+        ]);
+    } catch (\Exception $e) {
+        Yii::error('Error en actionIndex: ' . $e->getMessage());
+        Yii::$app->session->setFlash('error', 'Ha ocurrido un error al cargar los posts. Por favor, intente de nuevo.');
+        return $this->render('index', [
+            'posts' => [],
+            'modelComentario' => new Posts(),
+            'perPage' => 10,
+            'totalPosts' => 0,
+        ]);
+    }
 }
 
     /**
@@ -117,9 +179,47 @@ class SiteController extends BaseController
         return $this->goHome();
     }
 
+    public function actionGetPost($id)
+{
+    Yii::$app->response->format = Response::FORMAT_JSON;
+
+    // Buscar el post por ID
+    $post = Posts::findOne($id);
+
+    // Verificar si el post existe
+    if ($post) {
+        // Retornar la información del post
+        return [
+            'success' => true,
+            'post' => [
+                'id' => $post->id,
+                'usuario_id' => $post->usuario_id,
+                'contenido' => $post->contenido,
+                'created_at' => $post->created_at,
+                'updated_at' => $post->updated_at,
+                'likes' => $post->likes,
+                'dislikes' => $post->dislikes,
+                'comentarios' => $post->getComentarios() // Método para obtener los comentarios asociados, si existe
+            ]
+        ];
+    } else {
+        // Si no se encuentra el post, retornar error
+        return [
+            'success' => false,
+            'message' => 'Post no encontrado'
+        ];
+    }
+}
+
+
+
     public function actionLike($id)
 {
     if (Yii::$app->user->isGuest) {
+        if (Yii::$app->request->isAjax) {
+            Yii::$app->response->format = Response::FORMAT_JSON;
+            return ['success' => false, 'message' => 'Debes estar registrado para hacer miles de cosas asombrosas!'];
+        }
         Yii::$app->session->setFlash('error', 'Debes estar registrado para hacer miles de cosas asombrosas!');
         return $this->redirect(['site/login']);
     }
@@ -127,7 +227,13 @@ class SiteController extends BaseController
     $post = \app\models\Posts::findOne($id);
     if ($post) {
         $post->updateCounters(['likes' => 1]);
+        
+        if (Yii::$app->request->isAjax) {
+            Yii::$app->response->format = Response::FORMAT_JSON;
+            return ['success' => true, 'count' => $post->likes];
+        }
     }
+    
     $modalId = Yii::$app->request->get('modal');
     return $this->redirect(['index', 'modal' => $modalId]);
 }
@@ -135,6 +241,10 @@ class SiteController extends BaseController
 public function actionDislike($id)
 {
     if (Yii::$app->user->isGuest) {
+        if (Yii::$app->request->isAjax) {
+            Yii::$app->response->format = Response::FORMAT_JSON;
+            return ['success' => false, 'message' => 'Debes estar registrado para hacer miles de cosas asombrosas!'];
+        }
         Yii::$app->session->setFlash('error', 'Debes estar registrado para hacer miles de cosas asombrosas!');
         return $this->redirect(['site/login']);
     }
@@ -142,7 +252,13 @@ public function actionDislike($id)
     $post = \app\models\Posts::findOne($id);
     if ($post) {
         $post->updateCounters(['dislikes' => 1]);
+        
+        if (Yii::$app->request->isAjax) {
+            Yii::$app->response->format = Response::FORMAT_JSON;
+            return ['success' => true, 'count' => $post->dislikes];
+        }
     }
+    
     $modalId = Yii::$app->request->get('modal');
     return $this->redirect(['index', 'modal' => $modalId]);
 }
@@ -150,6 +266,10 @@ public function actionDislike($id)
     public function actionComment($post_id)
     {
         if (Yii::$app->user->isGuest) {
+            if (Yii::$app->request->isAjax) {
+                Yii::$app->response->format = Response::FORMAT_JSON;
+                return ['success' => false, 'message' => 'Debes estar registrado para comentar'];
+            }
             Yii::$app->session->setFlash('error', 'Debes estar registrado para comentar');
             return $this->redirect(['site/login']);
         }
@@ -184,7 +304,35 @@ public function actionDislike($id)
                 }
             }
 
+            if (Yii::$app->request->isAjax) {
+                Yii::$app->response->format = Response::FORMAT_JSON;
+                
+                // Renderizar el nuevo comentario usando renderAjax
+                $commentHtml = $this->renderPartial('_comentario', [
+                    'comentario' => $model,
+                    'modelComentario' => new Posts(),
+                ]);
+                
+                Yii::debug('HTML del comentario generado: ' . $commentHtml);
+                
+                return [
+                    'success' => true,
+                    'message' => 'Comentario publicado exitosamente',
+                    'commentHtml' => $commentHtml,
+                    'isMainPost' => ($post_id === $originalPost->id)
+                ];
+            }
+
             return $this->redirect(['index', 'modal' => $originalPost->id]);
+        }
+
+        if (Yii::$app->request->isAjax) {
+            Yii::$app->response->format = Response::FORMAT_JSON;
+            return [
+                'success' => false,
+                'message' => 'Error al publicar el comentario',
+                'errors' => $model->errors
+            ];
         }
 
         return $this->redirect(['index']);
@@ -197,6 +345,31 @@ public function actionDislike($id)
             'usuario_id' => $usuario_id,
         ]);
     }
+
+    public function actionApiLogs()
+{
+    \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+    $logs = \app\models\Logs::find()->orderBy(['fecha_hora' => SORT_DESC])->all();
+    $data = [];
+    foreach ($logs as $log) {
+        $data[] = [
+            'id'         => $log->id,
+            'ip'         => $log->ip,
+            'ubicacion'  => $log->ubicacion,
+            'accion'     => $log->accion,
+            'status'     => $log->status,
+            'fecha_hora' => $log->fecha_hora,
+            'useragent'  => $log->useragent,
+            'usuario'    => $log->usuario ? [
+                'id' => $log->usuario->id,
+                'user' => $log->usuario->user,
+                'rol_id' => $log->usuario->rol_id,
+            ] : null,
+        ];
+    }    
+    return $data;
+}
+
 
     /**
      * Acción para procesar el reporte de un post/comentario.
@@ -482,5 +655,58 @@ public function actionRegister()
     public function actionAbout()
     {
         return $this->render('about');
+    }
+
+    public function actionLogs()
+    {
+        return $this->render('logs');
+    }
+
+    public function actionLikeComment($id)
+    {
+        if (Yii::$app->user->isGuest) {
+            if (Yii::$app->request->isAjax) {
+                Yii::$app->response->format = Response::FORMAT_JSON;
+                return ['success' => false, 'message' => 'Debes estar registrado para hacer miles de cosas asombrosas!'];
+            }
+            Yii::$app->session->setFlash('error', 'Debes estar registrado para hacer miles de cosas asombrosas!');
+            return $this->redirect(['site/login']);
+        }
+
+        $comment = \app\models\Posts::findOne($id);
+        if ($comment) {
+            $comment->updateCounters(['likes' => 1]);
+            
+            if (Yii::$app->request->isAjax) {
+                Yii::$app->response->format = Response::FORMAT_JSON;
+                return ['success' => true, 'count' => $comment->likes];
+            }
+        }
+        
+        return $this->redirect(['index']);
+    }
+
+    public function actionDislikeComment($id)
+    {
+        if (Yii::$app->user->isGuest) {
+            if (Yii::$app->request->isAjax) {
+                Yii::$app->response->format = Response::FORMAT_JSON;
+                return ['success' => false, 'message' => 'Debes estar registrado para hacer miles de cosas asombrosas!'];
+            }
+            Yii::$app->session->setFlash('error', 'Debes estar registrado para hacer miles de cosas asombrosas!');
+            return $this->redirect(['site/login']);
+        }
+
+        $comment = \app\models\Posts::findOne($id);
+        if ($comment) {
+            $comment->updateCounters(['dislikes' => 1]);
+            
+            if (Yii::$app->request->isAjax) {
+                Yii::$app->response->format = Response::FORMAT_JSON;
+                return ['success' => true, 'count' => $comment->dislikes];
+            }
+        }
+        
+        return $this->redirect(['index']);
     }
 }
