@@ -34,6 +34,10 @@ $icon = match ($comentario->genre) {
             <i class="fa <?= $icon ?> me-2"></i>
             <span class="me-2"><?= Html::encode('@' . $comentario->id) ?></span>
             <span class="badge bg-light text-dark"><?= $comentario->age ?> años</span>
+            <?= $this->render('_block-buttons', [
+                'post_id' => $comentario->id,
+                'usuario_id' => $comentario->usuario_id
+            ]) ?>
         </div>
         <small class="text-muted"><?= Yii::$app->formatter->asDatetime($comentario->created_at) ?></small>
     </div>

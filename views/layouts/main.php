@@ -76,14 +76,28 @@ $this->registerLinkTag(['rel' => 'icon', 'type' => 'image/x-icon', 'href' => Yii
         ],
     ];
 
-    // Agregar el ítem de administración solo si el usuario tiene rol_id = 1313
-    if (!Yii::$app->user->isGuest && Yii::$app->user->identity->rol_id == 1313) {
-        $menuItems[] = [
-            'label' => '<i class="fas fa-cog"></i> Administración',
-            'url' => ['/site/logs'],
-            'encode' => false,
-            'options' => ['class' => 'nav-item mx-2']
-        ];
+    // Agregar el ítem de administración solo si el usuario tiene rol_id = 1313, 1314 o 1315
+    if (!Yii::$app->user->isGuest) {
+        $userRole = Yii::$app->user->identity->rol_id;
+        if (in_array($userRole, [1313, 1314, 1315])) {
+            $menuItems[] = [
+                'label' => '<i class="fas fa-cog"></i> Administración',
+                'encode' => false,
+                'options' => ['class' => 'nav-item mx-2'],
+                'items' => [
+                    [
+                        'label' => '<i class="fas fa-history"></i> Logs',
+                        'url' => ['/site/logs'],
+                        'encode' => false,
+                    ],
+                    [
+                        'label' => '<i class="fas fa-ban"></i> Gestión de Contenido',
+                        'url' => ['/site/gestion-contenido'],
+                        'encode' => false,
+                    ],
+                ],
+            ];
+        }
     }
 
     $menuItems[] = Yii::$app->user->isGuest

@@ -190,6 +190,95 @@ $this->registerCss(<<<CSS
             font-size: 1rem;
         }
     }
+
+    /* Estilos para los botones de bloqueo */
+    .ban-post-btn,
+    .ban-user-btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+        border-radius: 0.25rem;
+        transition: all 0.2s ease;
+        margin-left: 0.5rem;
+    }
+
+    .ban-post-btn:hover,
+    .ban-user-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .ban-post-btn i,
+    .ban-user-btn i {
+        margin-right: 0.25rem;
+    }
+
+    @media (max-width: 767px) {
+        .ban-post-btn .btn-label,
+        .ban-user-btn .btn-label {
+            display: none;
+        }
+        .ban-post-btn i,
+        .ban-user-btn i {
+            margin-right: 0;
+        }
+    }
+
+    /* Estilos para los modales de bloqueo */
+    #banModal .modal-content {
+        border-radius: 1rem;
+        border: none;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+
+    #banModal .modal-header {
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        padding: 1rem 1.5rem;
+    }
+
+    #banModal .modal-body {
+        padding: 1.5rem;
+        text-align: center;
+        font-size: 1.1rem;
+    }
+
+    #banModal .modal-footer {
+        border-top: 1px solid rgba(0, 0, 0, 0.1);
+        padding: 1rem 1.5rem;
+        justify-content: center;
+    }
+
+    #banModal .modal-title {
+        font-weight: 600;
+        font-size: 1.25rem;
+    }
+
+    #banModal .text-success {
+        color: #28a745 !important;
+    }
+
+    #banModal .text-danger {
+        color: #dc3545 !important;
+    }
+
+    @media (max-width: 767px) {
+        #banModal .modal-content {
+            border-radius: 0.75rem;
+        }
+        
+        #banModal .modal-header,
+        #banModal .modal-body,
+        #banModal .modal-footer {
+            padding: 0.75rem 1rem;
+        }
+        
+        #banModal .modal-title {
+            font-size: 1.1rem;
+        }
+        
+        #banModal .modal-body {
+            font-size: 1rem;
+        }
+    }
 CSS
 );
 
@@ -266,6 +355,120 @@ foreach ($flashTypes as $type) {
     <?php endif; ?>
 </div>
 
+<!-- Modales de bloqueo -->
+<div class="modal fade" id="confirmBanModal" tabindex="-1" aria-labelledby="confirmBanModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmBanModalLabel">Confirmar acción</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <p>¿Estás seguro de que deseas realizar esta acción?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmBanButton">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="banModal" tabindex="-1" aria-labelledby="banModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="banModalLabel">Resultado de la acción</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="banModalContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1050;
+}
+
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1040;
+}
+
+.modal-content {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    margin: 1.75rem auto;
+    border-radius: 15px;
+    border: none;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    background-color: #fff;
+}
+
+.modal-header {
+    background: linear-gradient(45deg, #6c5ce7, #a8a4e6);
+    color: white;
+    border-radius: 15px 15px 0 0;
+    padding: 1.5rem;
+    border-bottom: none;
+}
+
+.modal-body {
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.modal-footer {
+    border-top: none;
+    padding: 1.5rem;
+    justify-content: center;
+    border-radius: 0 0 15px 15px;
+}
+
+.btn-close {
+    filter: brightness(0) invert(1);
+}
+
+/* Animaciones */
+.modal.fade .modal-dialog {
+    transform: scale(0.8);
+    transition: transform 0.3s ease-in-out;
+}
+
+.modal.show .modal-dialog {
+    transform: scale(1);
+}
+
+.modal-backdrop.fade {
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.modal-backdrop.show {
+    opacity: 1;
+}
+</style>
+
 <?php
 // Si se recibe un parámetro "modal", reabrir ese modal automáticamente
 $modalId = Yii::$app->request->get('modal');
@@ -288,68 +491,69 @@ if ($modalId) {
 <?php
 // Registrar scripts
 $this->registerJs(<<<JS
-    // Variables para el infinite scroll
-    let currentPage = 1;
-    let isLoading = false;
-    let hasMore = true;
-    const perPage = $perPage;
-    const totalPosts = $totalPosts;
-    const totalPages = Math.ceil(totalPosts / perPage);
+    $(document).ready(function() {
+        // Variables para el infinite scroll
+        let currentPage = 1;
+        let isLoading = false;
+        let hasMore = true;
+        const perPage = $perPage;
+        const totalPosts = $totalPosts;
+        const totalPages = Math.ceil(totalPosts / perPage);
 
-    // Manejo de likes y dislikes con AJAX
-    $(document).on('submit', '.like-form, .dislike-form', function(e) {
-        e.preventDefault();
-        var form = $(this);
-        var url = form.attr('action');
-        var isLike = form.hasClass('like-form');
-        var countElement = isLike ? form.find('.likes-count') : form.find('.dislikes-count');
-        
-        $.post(url, function(response) {
-            if (response.success) {
-                countElement.text(response.count);
-            } else {
-                alert(response.message || 'Error al procesar la solicitud');
+        // Función para cargar más posts
+        function loadMorePosts() {
+            if (isLoading || !hasMore) return;
+            
+            isLoading = true;
+            $('#loading-spinner').show();
+            
+            $.ajax({
+                url: window.location.pathname,
+                type: 'GET',
+                data: {
+                    page: currentPage + 1
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $('#posts-container').append(response.html);
+                        currentPage++;
+                        hasMore = response.hasMore;
+                        
+                        // Reinicializar los modales de Bootstrap para los nuevos posts
+                        response.html.match(/id="commentModal\d+"/g).forEach(function(match) {
+                            const modalId = match.match(/\d+/)[0];
+                            new bootstrap.Modal(document.getElementById('commentModal' + modalId));
+                        });
+                    } else {
+                        hasMore = false;
+                        if (response.message) {
+                            alert(response.message);
+                        }
+                    }
+                },
+                error: function() {
+                    alert('Error al cargar más posts');
+                },
+                complete: function() {
+                    isLoading = false;
+                    $('#loading-spinner').hide();
+                }
+            });
+        }
+
+        // Detectar cuando el usuario llega al final de la página
+        $(window).scroll(function() {
+            var scrollHeight = $(document).height();
+            var scrollPosition = $(window).height() + $(window).scrollTop();
+            
+            // Si el usuario está a 100px del final, cargar más posts
+            if (scrollHeight - scrollPosition < 100) {
+                loadMorePosts();
             }
-        }).fail(function() {
-            alert('Error al procesar la solicitud');
         });
-    });
 
-    // Función para cargar más posts
-    function loadMorePosts() {
-        if (isLoading || !hasMore) return;
-        
-        isLoading = true;
-        $('#loading-spinner').show();
-        
-        $.get(window.location.pathname, {
-            page: currentPage + 1
-        })
-        .done(function(response) {
-            if (response.success) {
-                $('#posts-container').append(response.html);
-                currentPage++;
-                hasMore = response.hasMore;
-                
-                // Reinicializar los modales de Bootstrap para los nuevos posts
-                response.html.match(/id="commentModal\d+"/g).forEach(function(match) {
-                    const modalId = match.match(/\d+/)[0];
-                    new bootstrap.Modal(document.getElementById('commentModal' + modalId));
-                });
-            }
-        })
-        .fail(function() {
-            alert('Error al cargar más posts');
-        })
-        .always(function() {
-            isLoading = false;
-            $('#loading-spinner').hide();
-        });
-    }
-
-    // Detectar cuando el usuario llega al final de la página
-    $(window).scroll(function() {
-        if ($(window).scrollTop() + $(window).height() > $(document).height() - 100) {
+        // Cargar más posts cuando la página se carga inicialmente si hay pocos posts
+        if ($('#posts-container').children().length < perPage && hasMore) {
             loadMorePosts();
         }
     });

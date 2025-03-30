@@ -14,6 +14,8 @@ use app\models\Usuarios;
 use app\models\Notificaciones;
 use app\models\ReportedPosts;
 use app\models\ReportedUsers;
+use app\models\BannedPosts;
+use app\models\BannedUsuarios;
 
 class SiteController extends BaseController
 {
@@ -25,10 +27,15 @@ class SiteController extends BaseController
         return [
             'access' => [
                 'class' => AccessControl::class,
-                'only' => ['logout'],
+                'only' => ['logout', 'ban-post', 'ban-user'],
                 'rules' => [
                     [
                         'actions' => ['logout'],
+                        'allow' => true,
+                        'roles' => ['@'],
+                    ],
+                    [
+                        'actions' => ['ban-post', 'ban-user'],
                         'allow' => true,
                         'roles' => ['@'],
                     ],
@@ -38,8 +45,10 @@ class SiteController extends BaseController
                 'class' => VerbFilter::class,
                 'actions' => [
                     'logout' => ['post'],
-                    'like' => ['post'], // <--- Añadir esta línea
-                    'dislike' => ['post'], // <--- Añadir esta línea
+                    'like' => ['post'],
+                    'dislike' => ['post'],
+                    'ban-post' => ['post'],
+                    'ban-user' => ['post'],
                 ],
             ],
         ];
@@ -80,70 +89,109 @@ class SiteController extends BaseController
      * @return string
      */
     public function actionIndex()
-{
-    try {
-        $page = Yii::$app->request->get('page', 1);
-        $perPage = 10; // Número de posts por página
-        
-        $query = Posts::find()
-            ->where(['padre_id' => null])
-            ->with([
-                'usuario',
-                'posts' => function($query) {
-                    $query->with(['usuario'])
-                          ->orderBy(['created_at' => SORT_DESC]);
-                }
-            ])
-            ->orderBy(['created_at' => SORT_DESC]);
+    {
+        try {
+            $page = Yii::$app->request->get('page', 1);
+            $perPage = 10; // Número de posts por página
+            
+            // Diccionario de motivos
+            $motivos = [
+                'HATE_LANG' => 'Lenguaje que incita al odio',
+                'KIDS_HASSARAMENT' => 'Pedofilia',
+                'SENSIBLE_CONTENT' => 'Contenido extremadamente sensible',
+                'SCAM' => 'Estafa',
+                'SPAM' => 'Spam',
+                'RACIST_LANG' => 'Racismo o Xenofobia',
+                'MODERATED' => 'Moderado a razón de un administrador'
+            ];
+            
+            $query = Posts::find()
+                ->where(['padre_id' => null])
+                ->with([
+                    'usuario',
+                    'posts' => function($query) {
+                        $query->with(['usuario'])
+                              ->orderBy(['created_at' => SORT_DESC]);
+                    }
+                ])
+                ->orderBy(['created_at' => SORT_DESC]);
 
-        // Si es una solicitud AJAX, devolver solo los posts de la página solicitada
-        if (Yii::$app->request->isAjax) {
-            Yii::$app->response->format = Response::FORMAT_JSON;
+            // Si es una solicitud AJAX, devolver solo los posts de la página solicitada
+            if (Yii::$app->request->isAjax) {
+                Yii::$app->response->format = Response::FORMAT_JSON;
+                
+                $totalPosts = $query->count();
+                $totalPages = ceil($totalPosts / $perPage);
+                
+                // Asegurarse de que la página solicitada sea válida
+                if ($page > $totalPages) {
+                    return [
+                        'success' => false,
+                        'message' => 'No hay más posts disponibles',
+                        'hasMore' => false
+                    ];
+                }
+                
+                $posts = $query->offset(($page - 1) * $perPage)
+                              ->limit($perPage)
+                              ->all();
+                
+                // Verificar posts baneados
+                foreach ($posts as $post) {
+                    $bannedPost = BannedPosts::findOne(['post_id' => $post->id]);
+                    if ($bannedPost) {
+                        $post->contenido = "Este post ha sido bloqueado debido a: " . $motivos[$bannedPost->motivo];
+                    }
+                }
+                
+                $html = '';
+                foreach ($posts as $post) {
+                    $html .= $this->renderPartial('_post', [
+                        'post' => $post,
+                        'modelComentario' => new Posts(),
+                    ]);
+                }
+                
+                return [
+                    'success' => true,
+                    'html' => $html,
+                    'hasMore' => $page < $totalPages,
+                    'totalPages' => $totalPages,
+                    'currentPage' => $page,
+                    'totalPosts' => $totalPosts
+                ];
+            }
+
+            // Para la carga inicial, solo cargamos la primera página
+            $posts = $query->limit($perPage)->all();
             
-            $totalPosts = $query->count();
-            $totalPages = ceil($totalPosts / $perPage);
-            
-            $posts = $query->offset(($page - 1) * $perPage)
-                          ->limit($perPage)
-                          ->all();
-            
-            $html = '';
+            // Verificar posts baneados
             foreach ($posts as $post) {
-                $html .= $this->renderPartial('_post', [
-                    'post' => $post,
-                    'modelComentario' => new Posts(),
-                ]);
+                $bannedPost = BannedPosts::findOne(['post_id' => $post->id]);
+                if ($bannedPost) {
+                    $post->contenido = "Este post ha sido bloqueado debido a: " . $motivos[$bannedPost->motivo];
+                }
             }
             
-            return [
-                'success' => true,
-                'html' => $html,
-                'hasMore' => $page < $totalPages,
-                'totalPages' => $totalPages
-            ];
+            $modelComentario = new Posts();
+
+            return $this->render('index', [
+                'posts' => $posts,
+                'modelComentario' => $modelComentario,
+                'perPage' => $perPage,
+                'totalPosts' => $query->count(),
+            ]);
+        } catch (\Exception $e) {
+            Yii::error('Error en actionIndex: ' . $e->getMessage());
+            Yii::$app->session->setFlash('error', 'Ha ocurrido un error al cargar los posts. Por favor, intente de nuevo.');
+            return $this->render('index', [
+                'posts' => [],
+                'modelComentario' => new Posts(),
+                'perPage' => 10,
+                'totalPosts' => 0,
+            ]);
         }
-
-        // Para la carga inicial, solo cargamos la primera página
-        $posts = $query->limit($perPage)->all();
-        $modelComentario = new Posts();
-
-        return $this->render('index', [
-            'posts' => $posts,
-            'modelComentario' => $modelComentario,
-            'perPage' => $perPage,
-            'totalPosts' => $query->count(),
-        ]);
-    } catch (\Exception $e) {
-        Yii::error('Error en actionIndex: ' . $e->getMessage());
-        Yii::$app->session->setFlash('error', 'Ha ocurrido un error al cargar los posts. Por favor, intente de nuevo.');
-        return $this->render('index', [
-            'posts' => [],
-            'modelComentario' => new Posts(),
-            'perPage' => 10,
-            'totalPosts' => 0,
-        ]);
     }
-}
 
     /**
      * Login action.
@@ -708,5 +756,357 @@ public function actionRegister()
         }
         
         return $this->redirect(['index']);
+    }
+
+    /**
+     * Verifica si el usuario tiene un rol específico
+     * @param int $rolId
+     * @return bool
+     */
+    protected function hasRole($rolId)
+    {
+        if (Yii::$app->user->isGuest) {
+            return false;
+        }
+        return Yii::$app->user->identity->rol_id == $rolId;
+    }
+
+    /**
+     * Verifica si el usuario tiene alguno de los roles especificados
+     * @param array $rolIds
+     * @return bool
+     */
+    protected function hasAnyRole($rolIds)
+    {
+        if (Yii::$app->user->isGuest) {
+            return false;
+        }
+        return in_array(Yii::$app->user->identity->rol_id, $rolIds);
+    }
+
+    /**
+     * Acción para bloquear un post
+     * @return \yii\web\Response
+     */
+    public function actionBanPost()
+    {
+        Yii::$app->response->format = Response::FORMAT_JSON;
+
+        try {
+            $post_id = Yii::$app->request->post('post_id');
+            
+            // Validar que el post_id sea un número válido
+            if (!is_numeric($post_id) || $post_id <= 0) {
+                return [
+                    'success' => false,
+                    'message' => 'ID de post inválido',
+                    'type' => 'error'
+                ];
+            }
+
+            if (!$this->hasAnyRole([1313, 1314, 1315])) {
+                return [
+                    'success' => false,
+                    'message' => 'No tienes permisos para realizar esta acción',
+                    'type' => 'error'
+                ];
+            }
+
+            // Verificar si el post existe
+            $post = Posts::findOne($post_id);
+            if (!$post) {
+                return [
+                    'success' => false,
+                    'message' => 'El post no existe',
+                    'type' => 'error'
+                ];
+            }
+
+            // Verificar si el usuario está intentando banear su propio post
+            if ($post->usuario_id == Yii::$app->user->id) {
+                return [
+                    'success' => false,
+                    'message' => 'No puedes bloquear tu propio post',
+                    'type' => 'error'
+                ];
+            }
+
+            // Verificar si el post ya está bloqueado
+            if (BannedPosts::findOne(['post_id' => $post_id])) {
+                return [
+                    'success' => false,
+                    'message' => 'Este post ya está bloqueado',
+                    'type' => 'error'
+                ];
+            }
+
+            $bannedPost = new BannedPosts();
+            $bannedPost->post_id = $post_id;
+            $bannedPost->motivo = 'MODERATED';
+            $bannedPost->at_time = date('Y-m-d H:i:s');
+
+            if ($bannedPost->save()) {
+                return [
+                    'success' => true,
+                    'message' => 'Post bloqueado exitosamente',
+                    'type' => 'success'
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => 'Error al bloquear el post: ' . implode(', ', $bannedPost->getErrorSummary(true)),
+                'type' => 'error'
+            ];
+        } catch (\Exception $e) {
+            Yii::error('Error en actionBanPost: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Error al procesar la solicitud: ' . $e->getMessage(),
+                'type' => 'error'
+            ];
+        }
+    }
+
+    /**
+     * Acción para bloquear un usuario
+     * @return \yii\web\Response
+     */
+    public function actionBanUser()
+    {
+        Yii::$app->response->format = Response::FORMAT_JSON;
+
+        try {
+            $usuario_id = Yii::$app->request->post('usuario_id');
+            
+            // Validar que el usuario_id sea un número válido
+            if (!is_numeric($usuario_id) || $usuario_id <= 0) {
+                return [
+                    'success' => false,
+                    'message' => 'ID de usuario inválido',
+                    'type' => 'error'
+                ];
+            }
+
+            // Verificar si el usuario está intentando banearse a sí mismo
+            if ($usuario_id == Yii::$app->user->id) {
+                return [
+                    'success' => false,
+                    'message' => 'No puedes bloquear tu propia cuenta',
+                    'type' => 'error'
+                ];
+            }
+
+            if (!$this->hasAnyRole([1313, 1314, 1315])) {
+                return [
+                    'success' => false,
+                    'message' => 'No tienes permisos para realizar esta acción',
+                    'type' => 'error'
+                ];
+            }
+
+            // Verificar si el usuario existe
+            $usuario = Usuarios::findOne($usuario_id);
+            if (!$usuario) {
+                return [
+                    'success' => false,
+                    'message' => 'El usuario no existe',
+                    'type' => 'error'
+                ];
+            }
+
+            // Verificar si el usuario ya está bloqueado
+            if (BannedUsuarios::findOne(['usuario_id' => $usuario_id])) {
+                return [
+                    'success' => false,
+                    'message' => 'Este usuario ya está bloqueado',
+                    'type' => 'error'
+                ];
+            }
+
+            $bannedUser = new BannedUsuarios();
+            $bannedUser->usuario_id = $usuario_id;
+            $bannedUser->at_time = date('Y-m-d H:i:s');
+
+            if ($bannedUser->save()) {
+                return [
+                    'success' => true,
+                    'message' => 'Usuario bloqueado exitosamente',
+                    'type' => 'success'
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => 'Error al bloquear el usuario: ' . implode(', ', $bannedUser->getErrorSummary(true)),
+                'type' => 'error'
+            ];
+        } catch (\Exception $e) {
+            Yii::error('Error en actionBanUser: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Error al procesar la solicitud: ' . $e->getMessage(),
+                'type' => 'error'
+            ];
+        }
+    }
+
+    /**
+     * Acción para la gestión de contenido (posts y usuarios baneados)
+     * @return string
+     */
+    public function actionGestionContenido()
+    {
+        if (!$this->hasAnyRole([1313, 1314, 1315])) {
+            Yii::$app->session->setFlash('error', 'No tienes permisos para acceder a esta página.');
+            return $this->redirect(['index']);
+        }
+
+        // Diccionario de motivos
+        $motivos = [
+            'HATE_LANG' => 'Lenguaje que incita al odio',
+            'KIDS_HASSARAMENT' => 'Pedofilia',
+            'SENSIBLE_CONTENT' => 'Contenido extremadamente sensible',
+            'SCAM' => 'Estafa',
+            'SPAM' => 'Spam',
+            'RACIST_LANG' => 'Racismo o Xenofobia',
+            'MODERATED' => 'Moderado a razón de un administrador'
+        ];
+
+        // Obtener posts baneados con información relacionada
+        $postsBaneados = BannedPosts::find()
+            ->with(['post.usuario'])
+            ->all();
+
+        // Obtener usuarios baneados con información relacionada
+        $usuariosBaneados = BannedUsuarios::find()
+            ->with(['usuario'])
+            ->all();
+
+        return $this->render('gestion-contenido', [
+            'postsBaneados' => $postsBaneados,
+            'usuariosBaneados' => $usuariosBaneados,
+            'motivos' => $motivos
+        ]);
+    }
+
+    /**
+     * Acción para desbloquear un post
+     * @return \yii\web\Response
+     */
+    public function actionDesbloquearPost()
+    {
+        Yii::$app->response->format = Response::FORMAT_JSON;
+
+        try {
+            // Obtener el ID tanto de GET como de POST
+            $id = Yii::$app->request->get('id') ?? Yii::$app->request->post('id');
+            
+            if (!$id) {
+                return [
+                    'success' => false,
+                    'message' => 'ID no proporcionado',
+                    'type' => 'error'
+                ];
+            }
+
+            if (!$this->hasAnyRole([1313, 1314, 1315])) {
+                return [
+                    'success' => false,
+                    'message' => 'No tienes permisos para realizar esta acción',
+                    'type' => 'error'
+                ];
+            }
+
+            $bannedPost = BannedPosts::findOne($id);
+            if (!$bannedPost) {
+                return [
+                    'success' => false,
+                    'message' => 'El post no está bloqueado',
+                    'type' => 'error'
+                ];
+            }
+
+            if ($bannedPost->delete()) {
+                return [
+                    'success' => true,
+                    'message' => 'Post desbloqueado exitosamente',
+                    'type' => 'success'
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => 'Error al desbloquear el post',
+                'type' => 'error'
+            ];
+        } catch (\Exception $e) {
+            Yii::error('Error en actionDesbloquearPost: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Error al procesar la solicitud: ' . $e->getMessage(),
+                'type' => 'error'
+            ];
+        }
+    }
+
+    /**
+     * Acción para desbloquear un usuario
+     * @return \yii\web\Response
+     */
+    public function actionDesbloquearUsuario()
+    {
+        Yii::$app->response->format = Response::FORMAT_JSON;
+
+        try {
+            // Obtener el ID tanto de GET como de POST
+            $id = Yii::$app->request->get('id') ?? Yii::$app->request->post('id');
+            
+            if (!$id) {
+                return [
+                    'success' => false,
+                    'message' => 'ID no proporcionado',
+                    'type' => 'error'
+                ];
+            }
+
+            if (!$this->hasAnyRole([1313, 1314, 1315])) {
+                return [
+                    'success' => false,
+                    'message' => 'No tienes permisos para realizar esta acción',
+                    'type' => 'error'
+                ];
+            }
+
+            $bannedUser = BannedUsuarios::findOne($id);
+            if (!$bannedUser) {
+                return [
+                    'success' => false,
+                    'message' => 'El usuario no está bloqueado',
+                    'type' => 'error'
+                ];
+            }
+
+            if ($bannedUser->delete()) {
+                return [
+                    'success' => true,
+                    'message' => 'Usuario desbloqueado exitosamente',
+                    'type' => 'success'
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => 'Error al desbloquear el usuario',
+                'type' => 'error'
+            ];
+        } catch (\Exception $e) {
+            Yii::error('Error en actionDesbloquearUsuario: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Error al procesar la solicitud: ' . $e->getMessage(),
+                'type' => 'error'
+            ];
+        }
     }
 }

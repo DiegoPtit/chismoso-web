@@ -11,6 +11,7 @@ use Yii;
  * @property int $post_id
  * @property string $motivo
  * @property string $at_time
+ * @property Posts $post
  */
 class BannedPosts extends \yii\db\ActiveRecord
 {
@@ -30,10 +31,11 @@ class BannedPosts extends \yii\db\ActiveRecord
     public function rules()
     {
         return [
-            [['post_id', 'motivo'], 'required'],
+            [['post_id', 'motivo', 'at_time'], 'required'],
             [['post_id'], 'integer'],
             [['at_time'], 'safe'],
             [['motivo'], 'string', 'max' => 255],
+            [['post_id'], 'exist', 'skipOnError' => true, 'targetClass' => Posts::class, 'targetAttribute' => ['post_id' => 'id']],
         ];
     }
 
@@ -48,6 +50,16 @@ class BannedPosts extends \yii\db\ActiveRecord
             'motivo' => Yii::t('app', 'Motivo'),
             'at_time' => Yii::t('app', 'At Time'),
         ];
+    }
+
+    /**
+     * Gets query for [[Post]].
+     *
+     * @return \yii\db\ActiveQuery
+     */
+    public function getPost()
+    {
+        return $this->hasOne(Posts::class, ['id' => 'post_id']);
     }
 
 }

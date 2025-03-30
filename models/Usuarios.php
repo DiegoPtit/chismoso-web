@@ -14,9 +14,11 @@ use yii\web\IdentityInterface;
  * @property string $pwd
  * @property string $birthday
  * @property string|null $created_at
+ * @property int|null $rol_id
  *
  * @property Notificaciones[] $notificaciones
  * @property Posts[] $posts
+ * @property Roles $rol
  */
 class Usuarios extends \yii\db\ActiveRecord implements IdentityInterface
 {
@@ -96,6 +98,7 @@ class Usuarios extends \yii\db\ActiveRecord implements IdentityInterface
             [['user'], 'string', 'max' => 180],
             [['auth_key'], 'string', 'max' => 32],
             [['rol_id'], 'integer'],
+            [['rol_id'], 'exist', 'skipOnError' => true, 'targetClass' => Roles::class, 'targetAttribute' => ['rol_id' => 'id']],
         ];
     }
 
@@ -110,6 +113,7 @@ class Usuarios extends \yii\db\ActiveRecord implements IdentityInterface
             'pwd' => Yii::t('app', 'Contraseña'),
             'birthday' => Yii::t('app', 'Fecha de Nacimiento'),
             'created_at' => Yii::t('app', 'Created At'),
+            'rol_id' => Yii::t('app', 'Rol'),
         ];
     }
 
@@ -131,6 +135,16 @@ class Usuarios extends \yii\db\ActiveRecord implements IdentityInterface
     public function getPosts()
     {
         return $this->hasMany(Posts::class, ['usuario_id' => 'id']);
+    }
+
+    /**
+     * Gets query for [[Rol]].
+     *
+     * @return \yii\db\ActiveQuery
+     */
+    public function getRol()
+    {
+        return $this->hasOne(Roles::class, ['id' => 'rol_id']);
     }
 
 }

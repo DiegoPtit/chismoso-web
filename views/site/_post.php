@@ -7,6 +7,7 @@
 use yii\helpers\Html;
 use yii\bootstrap5\Modal;
 use yii\widgets\ActiveForm;
+use app\helpers\TimeHelper;
 
 // Definir colores según el género del post
 $headerFooterColor = match ($post->genre) {
@@ -31,8 +32,14 @@ $icon = match ($post->genre) {
 <!-- Tarjeta del post principal -->
 <div class="card mb-3 post-card" data-post-id="<?= $post->id ?>">
     <div class="card-header d-flex justify-content-between align-items-center" style="background-color: <?= $headerFooterColor ?>; color: #000;">
-        <span><?= Html::encode('@' . $post->id) ?></span>
-        <span><?= Yii::$app->formatter->asDatetime($post->created_at) ?></span>
+        <div class="d-flex align-items-center">
+            <span><?= Html::encode('@' . $post->id) ?></span>
+            <?= $this->render('_block-buttons', [
+                'post_id' => $post->id,
+                'usuario_id' => $post->usuario_id
+            ]) ?>
+        </div>
+        <span><?= TimeHelper::getRelativeTime($post->created_at) ?></span>
         <span>
             <i class="fa <?= $icon ?> me-2"></i>
             <strong><?= $post->age ?> años</strong>
@@ -84,7 +91,7 @@ $icon = match ($post->genre) {
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center" style="background-color: <?= $headerFooterColor ?>; color: #000;">
                 <span><?= Html::encode('@' . $post->id) ?></span>
-                <span><?= Yii::$app->formatter->asDatetime($post->created_at) ?></span>
+                <span><?= TimeHelper::getRelativeTime($post->created_at) ?></span>
                 <span>
                     <i class="fa <?= $icon ?> me-2"></i>
                     <strong><?= $post->age ?> años</strong>
