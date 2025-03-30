@@ -7,6 +7,10 @@ $this->title = 'Administración de Usuarios';
 
 // Almacenar el token CSRF en una variable PHP
 $csrfToken = Yii::$app->request->csrfToken;
+
+// Generar las URLs antes del script
+$cambiarRolUrl = Url::to(['site/cambiar-rol']);
+$eliminarUsuarioUrl = Url::to(['site/eliminar-usuario']);
 ?>
 
 <style>
@@ -143,6 +147,74 @@ $csrfToken = Yii::$app->request->csrfToken;
         }
         .stats-detail {
             font-size: 0.7rem;
+        }
+    }
+
+    /* Estilos base para el modal y backdrop */
+    .modal-backdrop {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: transparent !important;
+        z-index: 1040 !important;
+        pointer-events: none !important;
+    }
+
+    .modal {
+        z-index: 1050 !important;
+        padding-top: 80px !important;
+    }
+
+    .modal-dialog {
+        z-index: 1051 !important;
+    }
+
+    .modal-content {
+        z-index: 1052 !important;
+        position: relative;
+        background-color: #fff;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    .modal-backdrop.show {
+        pointer-events: none !important;
+        background-color: transparent !important;
+    }
+
+    .modal, .modal-dialog, .modal-content {
+        pointer-events: auto !important;
+    }
+
+    .modal.fade .modal-dialog {
+        transform: scale(0.8);
+        transition: transform 0.3s ease-in-out;
+    }
+
+    .modal.show .modal-dialog {
+        transform: scale(1);
+    }
+
+    @media (max-width: 767px) {
+        .modal {
+            padding-top: 60px !important;
+        }
+        
+        .modal-dialog {
+            margin: 1rem;
+            max-width: calc(100% - 2rem);
+        }
+        
+        .modal-body {
+            padding: 1rem;
+            max-height: 80vh;
+        }
+        
+        .modal-header,
+        .modal-footer {
+            padding: 1rem;
         }
     }
 </style>
@@ -292,25 +364,43 @@ $csrfToken = Yii::$app->request->csrfToken;
 
 <?php
 $script = <<<JS
+    // Verificar que jQuery esté cargado
+    if (typeof jQuery === 'undefined') {
+        console.error('jQuery no está cargado!');
+    } else {
+        console.log('jQuery está cargado correctamente');
+    }
+
     // Variables globales
     let confirmModal;
     let resultToast;
     let currentUsuarioId = null;
     let currentRolId = null;
 
+    // URLs para las acciones
+    const cambiarRolUrl = '$cambiarRolUrl';
+    const eliminarUsuarioUrl = '$eliminarUsuarioUrl';
+
     // Inicialización
     $(document).ready(function() {
+        console.log('Documento listo, inicializando...');
+        
         confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
         resultToast = new bootstrap.Toast(document.getElementById('resultToast'));
 
         // Manejar clic en cambiar rol
-        $('.cambiar-rol').on('click', function(e) {
+        $(document).on('click', '.cambiar-rol', function(e) {
+            console.log('Click en cambiar rol detectado');
             e.preventDefault();
             currentUsuarioId = $(this).closest('tr').find('td:first').text();
             currentRolId = $(this).data('rol');
             
+            console.log('Usuario ID:', currentUsuarioId);
+            console.log('Rol ID:', currentRolId);
+            
             $('#confirmMessage').text('¿Estás seguro de que deseas cambiar el rol de este usuario?');
             $('#confirmButton').off('click').on('click', function() {
+                console.log('Botón confirmar clickeado');
                 cambiarRol();
             });
             
@@ -318,23 +408,70 @@ $script = <<<JS
         });
 
         // Manejar clic en eliminar usuario
-        $('.eliminar-usuario').on('click', function(e) {
+        $(document).on('click', '.eliminar-usuario', function(e) {
+            console.log('Click en eliminar usuario detectado');
             e.preventDefault();
             currentUsuarioId = $(this).data('id');
             
+            console.log('Usuario ID a eliminar:', currentUsuarioId);
+            
             $('#confirmMessage').text('¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.');
             $('#confirmButton').off('click').on('click', function() {
+                console.log('Botón confirmar clickeado');
                 eliminarUsuario();
             });
             
             confirmModal.show();
         });
+
+        // Limpiar modales y backdrops al cargar la página
+        $('.modal-backdrop').remove();
+        $('body').removeClass('modal-open');
+        
+        // Asegurar que los modales sean clickeables
+        $('.modal').css('pointer-events', 'auto');
+        $('.modal .modal-content').css('pointer-events', 'auto');
+        
+        // Manejar clics en los modales
+        $('.modal').on('click', function(e) {
+            e.stopPropagation();
+        });
+        
+        // Manejar clics en el contenido de los modales
+        $('.modal .modal-content').on('click', function(e) {
+            e.stopPropagation();
+        });
+        
+        // Manejar la apertura de modales
+        $('.modal').on('show.bs.modal', function() {
+            $('.modal-backdrop').remove();
+            
+            $('<div>')
+                .addClass('modal-backdrop fade show')
+                .css({
+                    'z-index': '1040',
+                    'background-color': 'transparent',
+                    'pointer-events': 'none'
+                })
+                .appendTo('body');
+        });
+        
+        // Manejar el cierre de modales
+        $('.modal').on('hidden.bs.modal', function() {
+            $('.modal-backdrop').remove();
+            $('body').removeClass('modal-open');
+        });
     });
 
     // Función para cambiar rol
     function cambiarRol() {
+        console.log('Iniciando cambio de rol...');
+        console.log('Usuario ID:', currentUsuarioId);
+        console.log('Rol ID:', currentRolId);
+        console.log('URL:', cambiarRolUrl);
+        
         $.ajax({
-            url: 'index.php?r=site/cambiar-rol',
+            url: cambiarRolUrl,
             type: 'POST',
             data: {
                 usuario_id: currentUsuarioId,
@@ -342,38 +479,50 @@ $script = <<<JS
                 _csrf: '$csrfToken'
             },
             success: function(response) {
+                console.log('Respuesta:', response);
                 confirmModal.hide();
                 showResult(response.message, response.success);
                 if (response.success) {
                     setTimeout(() => location.reload(), 1500);
                 }
             },
-            error: function() {
+            error: function(xhr, status, error) {
+                console.log('Error:', error);
+                console.log('Status:', status);
+                console.log('XHR:', xhr);
                 confirmModal.hide();
-                showResult('Error al procesar la solicitud', false);
+                showResult('Error al procesar la solicitud: ' + error, false);
             }
         });
     }
 
     // Función para eliminar usuario
     function eliminarUsuario() {
+        console.log('Iniciando eliminación de usuario...');
+        console.log('Usuario ID:', currentUsuarioId);
+        console.log('URL:', eliminarUsuarioUrl);
+        
         $.ajax({
-            url: 'index.php?r=site/eliminar-usuario',
+            url: eliminarUsuarioUrl,
             type: 'POST',
             data: {
                 usuario_id: currentUsuarioId,
                 _csrf: '$csrfToken'
             },
             success: function(response) {
+                console.log('Respuesta:', response);
                 confirmModal.hide();
                 showResult(response.message, response.success);
                 if (response.success) {
                     setTimeout(() => location.reload(), 1500);
                 }
             },
-            error: function() {
+            error: function(xhr, status, error) {
+                console.log('Error:', error);
+                console.log('Status:', status);
+                console.log('XHR:', xhr);
                 confirmModal.hide();
-                showResult('Error al procesar la solicitud', false);
+                showResult('Error al procesar la solicitud: ' + error, false);
             }
         });
     }
