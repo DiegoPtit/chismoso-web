@@ -991,6 +991,130 @@ public function actionRegister()
     }
 
     /**
+     * Acción para la administración de usuarios
+     * @return string
+     */
+    public function actionAdminUsuarios()
+    {
+        if (!$this->hasAnyRole([1313, 1314, 1315])) {
+            Yii::$app->session->setFlash('error', 'No tienes permisos para acceder a esta página.');
+            return $this->redirect(['index']);
+        }
+
+        // Obtener todos los usuarios
+        $usuarios = Usuarios::find()->all();
+
+        return $this->render('admin-usuarios', [
+            'usuarios' => $usuarios
+        ]);
+    }
+
+    /**
+     * Acción para cambiar el rol de un usuario
+     * @return \yii\web\Response
+     */
+    public function actionCambiarRol()
+    {
+        Yii::$app->response->format = Response::FORMAT_JSON;
+
+        if (!$this->hasAnyRole([1313, 1314, 1315])) {
+            return [
+                'success' => false,
+                'message' => 'No tienes permisos para realizar esta acción',
+                'type' => 'error'
+            ];
+        }
+
+        $usuario_id = Yii::$app->request->post('usuario_id');
+        $nuevo_rol = Yii::$app->request->post('rol_id');
+
+        // Validar que el rol sea uno de los permitidos
+        $roles_permitidos = [1313, 1314, 1315, 1316];
+        if (!in_array($nuevo_rol, $roles_permitidos)) {
+            return [
+                'success' => false,
+                'message' => 'Rol no válido',
+                'type' => 'error'
+            ];
+        }
+
+        $usuario = Usuarios::findOne($usuario_id);
+        if (!$usuario) {
+            return [
+                'success' => false,
+                'message' => 'Usuario no encontrado',
+                'type' => 'error'
+            ];
+        }
+
+        $usuario->rol_id = $nuevo_rol;
+        if ($usuario->save()) {
+            return [
+                'success' => true,
+                'message' => 'Rol actualizado exitosamente',
+                'type' => 'success'
+            ];
+        }
+
+        return [
+            'success' => false,
+            'message' => 'Error al actualizar el rol',
+            'type' => 'error'
+        ];
+    }
+
+    /**
+     * Acción para eliminar un usuario
+     * @return \yii\web\Response
+     */
+    public function actionEliminarUsuario()
+    {
+        Yii::$app->response->format = Response::FORMAT_JSON;
+
+        if (!$this->hasAnyRole([1313, 1314, 1315])) {
+            return [
+                'success' => false,
+                'message' => 'No tienes permisos para realizar esta acción',
+                'type' => 'error'
+            ];
+        }
+
+        $usuario_id = Yii::$app->request->post('usuario_id');
+
+        $usuario = Usuarios::findOne($usuario_id);
+        if (!$usuario) {
+            return [
+                'success' => false,
+                'message' => 'Usuario no encontrado',
+                'type' => 'error'
+            ];
+        }
+
+        // No permitir eliminar el propio usuario
+        if ($usuario_id == Yii::$app->user->id) {
+            return [
+                'success' => false,
+                'message' => 'No puedes eliminar tu propia cuenta',
+                'type' => 'error'
+            ];
+        }
+
+        if ($usuario->delete()) {
+            return [
+                'success' => true,
+                'message' => 'Usuario eliminado exitosamente',
+                'type' => 'success'
+            ];
+        }
+
+        return [
+            'success' => false,
+            'message' => 'Error al eliminar el usuario',
+            'type' => 'error'
+        ];
+    }
+
+    /**
      * Acción para desbloquear un post
      * @return \yii\web\Response
      */

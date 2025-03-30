@@ -21,8 +21,8 @@ switch ($post->genre) {
         break;
 }
 ?>
-<div class="card mb-3">
-    <div class="card-header d-flex justify-content-between align-items-center" style="background-color: <?= $headerFooterColor ?>; color: #000;">
+<div class="card mb-3 dashboard-card">
+    <div class="card-header d-flex justify-content-between align-items-center" style="background: linear-gradient(45deg, <?= $headerFooterColor ?>, <?= $bodyColor ?>); color: #000;">
         <span><?= Html::encode('@' . $post->id) ?></span>
         <span><?= Yii::$app->formatter->asDatetime($post->created_at) ?></span>
         <span>
@@ -31,9 +31,9 @@ switch ($post->genre) {
         </span>
     </div>
     <div class="card-body" style="background-color: <?= $bodyColor ?>;">
-        <p><?= Html::encode($post->contenido) ?></p>
+        <p class="mb-0"><?= Html::encode($post->contenido) ?></p>
     </div>
-    <div class="card-footer" style="background-color: <?= $headerFooterColor ?>; color: #000;">
+    <div class="card-footer" style="background: linear-gradient(45deg, <?= $headerFooterColor ?>, <?= $bodyColor ?>); color: #000;">
         <div class="d-flex align-items-center">
             <!-- Formulario de Like -->
             <?= Html::beginForm(['/site/like', 'id' => $post->id], 'post') ?>
@@ -69,3 +69,46 @@ switch ($post->genre) {
         </div>
     </div>
 </div>
+
+<style>
+.dashboard-card {
+    border-radius: 15px;
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+    margin-bottom: 1.5rem;
+}
+.dashboard-card:hover {
+    transform: translateY(-5px);
+}
+.card-header {
+    border-radius: 15px 15px 0 0 !important;
+    padding: 1.5rem;
+}
+.card-body {
+    padding: 1.5rem;
+}
+.card-footer {
+    border-radius: 0 0 15px 15px;
+    padding: 1rem 1.5rem;
+}
+.btn-link {
+    text-decoration: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    transition: background-color 0.2s;
+}
+.btn-link:hover {
+    background-color: rgba(0,0,0,0.1);
+}
+.icono-reporte {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    transition: background-color 0.2s;
+    color: #d93e3e;
+    text-decoration: none;
+}
+.icono-reporte:hover {
+    background-color: rgba(0,0,0,0.1);
+}
+</style>

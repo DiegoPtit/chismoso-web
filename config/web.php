@@ -11,6 +11,9 @@ $config = [
         '@bower' => '@vendor/bower-asset',
         '@npm'   => '@vendor/npm-asset',
     ],
+    'as databaseErrorBehavior' => [
+        'class' => 'app\components\DatabaseErrorBehavior',
+    ],
     'components' => [
         'request' => [
             // !!! insert a secret key in the following (if it is empty) - this is required by cookie validation
@@ -27,7 +30,8 @@ $config = [
             'enableAutoLogin' => true,
         ],
         'errorHandler' => [
-            'errorAction' => 'site/error',
+            'errorAction' => 'error/database-error',
+            'errorView' => '@app/views/error/database-error.php',
         ],
         'mailer' => [
             'class' => \yii\symfonymailer\Mailer::class,
@@ -45,6 +49,13 @@ $config = [
             ],
         ],
         'db' => $db,
+        'urlManager' => [
+            'enablePrettyUrl' => true,
+            'showScriptName' => false,
+            'rules' => [
+                // Aquí puedes agregar reglas personalizadas si las necesitas
+            ],
+        ],
         /*
         'urlManager' => [
             'enablePrettyUrl' => true,

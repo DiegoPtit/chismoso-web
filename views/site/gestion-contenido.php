@@ -334,7 +334,7 @@ $this->registerJs($script);
         bottom: 0;
         left: 0;
         z-index: 1000;
-        padding: 48px 0 0;
+        padding: 120px 0 0;
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         background: white;
         transition: all 0.3s ease;

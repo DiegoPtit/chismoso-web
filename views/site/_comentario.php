@@ -28,8 +28,8 @@ $icon = match ($comentario->genre) {
 };
 ?>
 
-<div class="card mb-3 subcomments" id="comentario-<?= $comentario->id ?>">
-    <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center" style="background-color: <?= $headerFooterColor ?>; color: #000;">
+<div class="card mb-3 dashboard-card subcomments" id="comentario-<?= $comentario->id ?>">
+    <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center" style="background: linear-gradient(45deg, <?= $headerFooterColor ?>, <?= $bodyColor ?>); color: #000;">
         <div class="d-flex align-items-center mb-2 mb-md-0">
             <i class="fa <?= $icon ?> me-2"></i>
             <span class="me-2"><?= Html::encode('@' . $comentario->id) ?></span>
@@ -44,7 +44,7 @@ $icon = match ($comentario->genre) {
     <div class="card-body" style="background-color: <?= $bodyColor ?>;">
         <p class="mb-0"><?= Html::encode($comentario->contenido) ?></p>
     </div>
-    <div class="card-footer" style="background-color: <?= $headerFooterColor ?>; color: #000;">
+    <div class="card-footer" style="background: linear-gradient(45deg, <?= $headerFooterColor ?>, <?= $bodyColor ?>); color: #000;">
         <div class="d-flex flex-wrap align-items-center gap-2">
             <div class="d-flex gap-2">
                 <?= Html::beginForm(['/site/like-comment', 'id' => $comentario->id], 'post', ['class' => 'comment-like-form']) ?>
@@ -154,128 +154,134 @@ $icon = match ($comentario->genre) {
     <?php endif; ?>
 </div>
 
-<?php
-$this->registerCss(<<<CSS
+<style>
+.dashboard-card {
+    border-radius: 15px;
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+    margin-bottom: 1.5rem;
+}
+.dashboard-card:hover {
+    transform: translateY(-5px);
+}
+.card-header {
+    border-radius: 15px 15px 0 0 !important;
+    padding: 1.5rem;
+}
+.card-body {
+    padding: 1.5rem;
+}
+.card-footer {
+    border-radius: 0 0 15px 15px;
+    padding: 1rem 1.5rem;
+}
+.btn-link {
+    text-decoration: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    transition: background-color 0.2s;
+}
+.btn-link:hover {
+    background-color: rgba(0,0,0,0.1);
+}
+.icono-reporte {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    transition: background-color 0.2s;
+    color: #d93e3e;
+    text-decoration: none;
+}
+.icono-reporte:hover {
+    background-color: rgba(0,0,0,0.1);
+}
+.subcomments {
+    margin-left: 0.5rem;
+}
+@media (min-width: 768px) {
     .subcomments {
-        margin-left: 0.5rem;
+        margin-left: 1.5rem;
     }
-    @media (min-width: 768px) {
-        .subcomments {
-            margin-left: 1.5rem;
-        }
+}
+.comment-form-container {
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.comment-form .form-control,
+.comment-form .form-select {
+    border-radius: 0.5rem;
+    border: 1px solid #dee2e6;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+.comment-form .form-control:focus,
+.comment-form .form-select:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+}
+.comment-form textarea.form-control {
+    resize: none;
+    min-height: 100px;
+}
+.comment-form .btn-primary {
+    border-radius: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+.comment-form .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.comment-form .form-control::placeholder {
+    color: #adb5bd;
+}
+@media (max-width: 767px) {
+    .card-footer {
+        padding: 0.75rem;
     }
-    .card-footer .btn-link {
-        text-decoration: none;
-        padding: 0.25rem 0.5rem;
-        border-radius: 0.25rem;
-        transition: background-color 0.2s;
-        white-space: nowrap;
+    .card-footer .d-flex {
+        flex-wrap: wrap;
+        gap: 0.5rem;
     }
-    .card-footer .btn-link:hover {
-        background-color: rgba(0,0,0,0.1);
+    .card-footer .btn-link,
+    .card-footer .icono-reporte {
+        padding: 0.5rem;
+        font-size: 0.9rem;
     }
-    .icono-reporte {
-        padding: 0.25rem 0.5rem;
-        border-radius: 0.25rem;
-        transition: background-color 0.2s;
-        color: #d93e3e;
-        white-space: nowrap;
+    .card-footer .btn-label {
+        display: none;
     }
-    .icono-reporte:hover {
-        background-color: rgba(0,0,0,0.1);
+    .card-footer .btn i,
+    .card-footer .icono-reporte i {
+        margin-right: 0 !important;
     }
-    .card-footer.bg-light {
-        border-top: 1px solid rgba(0,0,0,.125);
+    .card-footer .ms-auto {
+        margin-left: 0 !important;
+        width: 100%;
+        justify-content: flex-end;
     }
-    .card-footer.bg-light .btn-link {
-        color: #6c757d;
-        transition: all 0.2s ease;
-    }
-    .card-footer.bg-light .btn-link:hover {
-        color: #343a40;
-        background-color: rgba(0,0,0,.05);
+    .subcomments {
+        margin-left: 0.25rem;
     }
     .comment-form-container {
-        background-color: #f8f9fa;
-        border-radius: 0.5rem;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        padding: 1rem;
     }
     .comment-form .form-control,
     .comment-form .form-select {
-        border-radius: 0.5rem;
-        border: 1px solid #dee2e6;
-        padding: 0.75rem 1rem;
-        font-size: 1rem;
-        transition: all 0.2s ease;
-    }
-    .comment-form .form-control:focus,
-    .comment-form .form-select:focus {
-        border-color: #80bdff;
-        box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
-    }
-    .comment-form textarea.form-control {
-        resize: none;
-        min-height: 100px;
+        font-size: 0.9rem;
+        padding: 0.5rem 0.75rem;
     }
     .comment-form .btn-primary {
-        border-radius: 0.5rem;
-        padding: 0.75rem 1.5rem;
-        font-weight: 500;
-        transition: all 0.2s ease;
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
     }
-    .comment-form .btn-primary:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    .comment-form .form-control::placeholder {
-        color: #adb5bd;
-    }
+}
+</style>
 
-    /* Estilos móviles mejorados */
-    @media (max-width: 767px) {
-        .card-footer {
-            padding: 0.75rem;
-        }
-        .card-footer .d-flex {
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-        .card-footer .btn-link,
-        .card-footer .icono-reporte {
-            padding: 0.5rem;
-            font-size: 0.9rem;
-        }
-        .card-footer .btn-label {
-            display: none;
-        }
-        .card-footer .btn i,
-        .card-footer .icono-reporte i {
-            margin-right: 0 !important;
-        }
-        .card-footer .ms-auto {
-            margin-left: 0 !important;
-            width: 100%;
-            justify-content: flex-end;
-        }
-        .subcomments {
-            margin-left: 0.25rem;
-        }
-        .comment-form-container {
-            padding: 1rem;
-        }
-        .comment-form .form-control,
-        .comment-form .form-select {
-            font-size: 0.9rem;
-            padding: 0.5rem 0.75rem;
-        }
-        .comment-form .btn-primary {
-            padding: 0.5rem 1rem;
-            font-size: 0.9rem;
-        }
-    }
-CSS
-);
-
+<?php
 $this->registerJs(<<<JS
     // Manejo de likes y dislikes con AJAX para comentarios
     $(document).on('submit', '.comment-like-form, .comment-dislike-form', function(e) {

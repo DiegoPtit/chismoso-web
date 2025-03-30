@@ -392,61 +392,44 @@ foreach ($flashTypes as $type) {
 </div>
 
 <style>
-.modal {
-    position: fixed;
+/* Estilos base para el modal y backdrop */
+.modal-backdrop {
+    position: fixed !important;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 1050;
+    background-color: transparent !important;
+    z-index: 1040 !important;
+    pointer-events: none !important;
 }
 
-.modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1040;
+.modal {
+    z-index: 1050 !important;
+    padding-top: 80px !important; /* Añadido para evitar interferencia con el navbar */
+}
+
+.modal-dialog {
+    z-index: 1051 !important;
 }
 
 .modal-content {
+    z-index: 1052 !important;
     position: relative;
-    width: 100%;
-    max-width: 400px;
-    margin: 1.75rem auto;
-    border-radius: 15px;
-    border: none;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     background-color: #fff;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
 }
 
-.modal-header {
-    background: linear-gradient(45deg, #6c5ce7, #a8a4e6);
-    color: white;
-    border-radius: 15px 15px 0 0;
-    padding: 1.5rem;
-    border-bottom: none;
+/* Asegurar que el backdrop no interfiera con los clics */
+.modal-backdrop.show {
+    pointer-events: none !important;
+    background-color: transparent !important;
 }
 
-.modal-body {
-    padding: 1.5rem;
-    text-align: center;
-}
-
-.modal-footer {
-    border-top: none;
-    padding: 1.5rem;
-    justify-content: center;
-    border-radius: 0 0 15px 15px;
-}
-
-.btn-close {
-    filter: brightness(0) invert(1);
+/* Hacer que el contenido del modal sea clickeable */
+.modal, .modal-dialog, .modal-content {
+    pointer-events: auto !important;
 }
 
 /* Animaciones */
@@ -459,13 +442,63 @@ foreach ($flashTypes as $type) {
     transform: scale(1);
 }
 
-.modal-backdrop.fade {
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
+/* Asegurar que el modal esté por encima del backdrop */
+.modal.show {
+    z-index: 1050 !important;
 }
 
-.modal-backdrop.show {
-    opacity: 1;
+.modal.show .modal-dialog {
+    z-index: 1051 !important;
+}
+
+.modal.show .modal-content {
+    z-index: 1052 !important;
+}
+
+/* Ajustes para móviles */
+@media (max-width: 767px) {
+    .modal {
+        padding-top: 60px !important; /* Padding más pequeño para móviles */
+    }
+    
+    .modal-dialog {
+        margin: 1rem;
+        max-width: calc(100% - 2rem);
+    }
+    
+    .modal-body {
+        padding: 1rem;
+        max-height: 80vh;
+    }
+    
+    .modal-header,
+    .modal-footer {
+        padding: 1rem;
+    }
+}
+
+/* Estilos para el contenedor de comentarios */
+.comments-container {
+    max-height: 500px;
+    overflow-y: auto;
+    padding: 1rem;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.comments-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.comments-container::-webkit-scrollbar-track {
+    background: #f3f3f3;
+    border-radius: 3px;
+}
+
+.comments-container::-webkit-scrollbar-thumb {
+    background: #4a90e2;
+    border-radius: 3px;
 }
 </style>
 
@@ -475,10 +508,34 @@ $modalId = Yii::$app->request->get('modal');
 if ($modalId) {
     $this->registerJs("
         $(document).ready(function(){
+            // Limpiar cualquier modal o backdrop existente
+            $('.modal-backdrop').remove();
+            $('body').removeClass('modal-open');
+            
             var modal = new bootstrap.Modal(document.getElementById('commentModal$modalId'));
-            modal.show();
+            
+            // Manejar el cierre del modal
             $('#commentModal$modalId').on('hidden.bs.modal', function(){
+                $('.modal-backdrop').remove();
+                $('body').removeClass('modal-open');
                 window.location.href = window.location.pathname;
+            });
+            
+            // Mostrar el modal
+            modal.show();
+            
+            // Asegurar que el modal y su contenido sean clickeables
+            $('#commentModal$modalId').css('pointer-events', 'auto');
+            $('#commentModal$modalId .modal-content').css('pointer-events', 'auto');
+            
+            // Manejar clics en el modal
+            $('#commentModal$modalId').on('click', function(e) {
+                e.stopPropagation();
+            });
+            
+            // Manejar clics en el contenido del modal
+            $('#commentModal$modalId .modal-content').on('click', function(e) {
+                e.stopPropagation();
             });
         });
     ");
@@ -492,6 +549,46 @@ if ($modalId) {
 // Registrar scripts
 $this->registerJs(<<<JS
     $(document).ready(function() {
+        // Limpiar modales y backdrops al cargar la página
+        $('.modal-backdrop').remove();
+        $('body').removeClass('modal-open');
+        
+        // Asegurar que los modales sean clickeables
+        $('.modal').css('pointer-events', 'auto');
+        $('.modal .modal-content').css('pointer-events', 'auto');
+        
+        // Manejar clics en los modales
+        $('.modal').on('click', function(e) {
+            e.stopPropagation();
+        });
+        
+        // Manejar clics en el contenido de los modales
+        $('.modal .modal-content').on('click', function(e) {
+            e.stopPropagation();
+        });
+        
+        // Manejar la apertura de modales
+        $('.modal').on('show.bs.modal', function() {
+            // Remover cualquier backdrop existente
+            $('.modal-backdrop').remove();
+            
+            // Crear un nuevo backdrop transparente
+            $('<div>')
+                .addClass('modal-backdrop fade show')
+                .css({
+                    'z-index': '1040',
+                    'background-color': 'transparent',
+                    'pointer-events': 'none'
+                })
+                .appendTo('body');
+        });
+        
+        // Manejar el cierre de modales
+        $('.modal').on('hidden.bs.modal', function() {
+            $('.modal-backdrop').remove();
+            $('body').removeClass('modal-open');
+        });
+        
         // Variables para el infinite scroll
         let currentPage = 1;
         let isLoading = false;
