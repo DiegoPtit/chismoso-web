@@ -76,3 +76,137 @@ $this->params['breadcrumbs'][] = $this->title;
 <?php ActiveForm::end(); ?>
 
 <?php Modal::end(); ?>
+
+<style>
+/* Estilos base para el modal y backdrop */
+.modal-backdrop {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: transparent !important;
+    z-index: 1040 !important;
+    pointer-events: none !important;
+}
+
+.modal {
+    z-index: 1050 !important;
+    padding-top: 80px !important;
+}
+
+.modal-dialog {
+    z-index: 1051 !important;
+}
+
+.modal-content {
+    z-index: 1052 !important;
+    position: relative;
+    background-color: #fff;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+/* Asegurar que el backdrop no interfiera con los clics */
+.modal-backdrop.show {
+    pointer-events: none !important;
+    background-color: transparent !important;
+}
+
+/* Hacer que el contenido del modal sea clickeable */
+.modal, .modal-dialog, .modal-content {
+    pointer-events: auto !important;
+}
+
+/* Animaciones */
+.modal.fade .modal-dialog {
+    transform: scale(0.8);
+    transition: transform 0.3s ease-in-out;
+}
+
+.modal.show .modal-dialog {
+    transform: scale(1);
+}
+
+/* Asegurar que el modal esté por encima del backdrop */
+.modal.show {
+    z-index: 1050 !important;
+}
+
+.modal.show .modal-dialog {
+    z-index: 1051 !important;
+}
+
+.modal.show .modal-content {
+    z-index: 1052 !important;
+}
+
+/* Ajustes para móviles */
+@media (max-width: 767px) {
+    .modal {
+        padding-top: 60px !important;
+    }
+    
+    .modal-dialog {
+        margin: 1rem;
+        max-width: calc(100% - 2rem);
+    }
+    
+    .modal-body {
+        padding: 1rem;
+        max-height: 80vh;
+    }
+    
+    .modal-header,
+    .modal-footer {
+        padding: 1rem;
+    }
+}
+</style>
+
+<?php
+$this->registerJs(<<<JS
+    $(document).ready(function() {
+        // Limpiar modales y backdrops al cargar la página
+        $('.modal-backdrop').remove();
+        $('body').removeClass('modal-open');
+        
+        // Asegurar que los modales sean clickeables
+        $('.modal').css('pointer-events', 'auto');
+        $('.modal .modal-content').css('pointer-events', 'auto');
+        
+        // Manejar clics en los modales
+        $('.modal').on('click', function(e) {
+            e.stopPropagation();
+        });
+        
+        // Manejar clics en el contenido de los modales
+        $('.modal .modal-content').on('click', function(e) {
+            e.stopPropagation();
+        });
+        
+        // Manejar la apertura de modales
+        $('.modal').on('show.bs.modal', function() {
+            // Remover cualquier backdrop existente
+            $('.modal-backdrop').remove();
+            
+            // Crear un nuevo backdrop transparente
+            $('<div>')
+                .addClass('modal-backdrop fade show')
+                .css({
+                    'z-index': '1040',
+                    'background-color': 'transparent',
+                    'pointer-events': 'none'
+                })
+                .appendTo('body');
+        });
+        
+        // Manejar el cierre de modales
+        $('.modal').on('hidden.bs.modal', function() {
+            $('.modal-backdrop').remove();
+            $('body').removeClass('modal-open');
+        });
+    });
+JS
+);
+?>
