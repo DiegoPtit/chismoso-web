@@ -1,330 +1,128 @@
 <?php
-
 use yii\helpers\Html;
 use yii\helpers\Url;
 
 $this->title = 'Administración de Usuarios';
 
+// Verificar que el usuario está autenticado y tiene rol adecuado
+if (Yii::$app->user->isGuest || !in_array(Yii::$app->user->identity->rol_id, [1313, 1314, 1315])) {
+    Yii::$app->session->setFlash('error', 'No tienes permiso para acceder a esta sección.');
+    return Yii::$app->response->redirect(['site/index']);
+}
+
 // Almacenar el token CSRF en una variable PHP
 $csrfToken = Yii::$app->request->csrfToken;
 
 // Generar las URLs antes del script
-$cambiarRolUrl = Url::to(['site/cambiar-rol']);
-$eliminarUsuarioUrl = Url::to(['site/eliminar-usuario']);
+$cambiarRolUrl = Url::to(['admin/cambiar-rol']);
+$eliminarUsuarioUrl = Url::to(['admin/eliminar-usuario']);
 ?>
 
-<style>
-    .dashboard-card {
-        border-radius: 15px;
-        border: none;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        transition: transform 0.3s ease;
-    }
-    .dashboard-card:hover {
-        transform: translateY(-5px);
-    }
-    .card-header {
-        background: linear-gradient(45deg, #6c5ce7, #a8a4e6);
-        color: white;
-        border-radius: 15px 15px 0 0 !important;
-        padding: 1.5rem;
-    }
-    .card-header h6 {
-        margin: 0;
-        font-size: 1.1rem;
-        font-weight: 600;
-    }
-    .card-body {
-        padding: 1.5rem;
-    }
-    .table {
-        margin: 0;
-    }
-    .table th {
-        border-top: none;
-        font-weight: 600;
-        color: #6c5ce7;
-        background-color: #f8f9fa;
-    }
-    .table td {
-        vertical-align: middle;
-    }
-    .badge {
-        padding: 0.5em 1em;
-        border-radius: 20px;
-        font-weight: 500;
-    }
-    .btn-group .btn {
-        border-radius: 20px;
-        padding: 0.5rem 1rem;
-        font-weight: 500;
-        transition: all 0.3s ease;
-    }
-    .btn-group .btn:hover {
-        transform: translateY(-2px);
-    }
-    .dropdown-menu {
-        border-radius: 15px;
-        border: none;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    .dropdown-item {
-        padding: 0.5rem 1rem;
-        transition: all 0.3s ease;
-    }
-    .dropdown-item:hover {
-        background-color: #f8f9fa;
-        transform: translateX(5px);
-    }
-    .modal-content {
-        border-radius: 15px;
-        border: none;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-    }
-    .modal-header {
-        background: linear-gradient(45deg, #6c5ce7, #a8a4e6);
-        color: white;
-        border-radius: 15px 15px 0 0;
-        padding: 1.5rem;
-    }
-    .btn-close {
-        filter: brightness(0) invert(1);
-    }
-    .toast {
-        border-radius: 15px;
-        border: none;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    .toast-header {
-        border-radius: 15px 15px 0 0;
-        background: linear-gradient(45deg, #6c5ce7, #a8a4e6);
-        color: white;
-    }
-    .toast-header .btn-close {
-        filter: brightness(0) invert(1);
-    }
-    .stats-card {
-        background: linear-gradient(45deg, #00b894, #00cec9);
-        color: white;
-        border-radius: 15px;
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-        position: relative;
-        overflow: hidden;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-    .stats-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 15px rgba(0,0,0,0.1);
-    }
-    .stats-number {
-        font-size: 2rem;
-        font-weight: 700;
-        margin: 0;
-        line-height: 1.2;
-    }
-    .stats-label {
-        font-size: 0.9rem;
-        opacity: 0.9;
-        margin: 0.5rem 0;
-    }
-    .stats-detail {
-        font-size: 0.8rem;
-        opacity: 0.8;
-        margin: 0;
-        display: block;
-    }
-    @media (max-width: 767px) {
-        .stats-card {
-            padding: 1rem;
-        }
-        .stats-number {
-            font-size: 1.5rem;
-        }
-        .stats-label {
-            font-size: 0.8rem;
-        }
-        .stats-detail {
-            font-size: 0.7rem;
-        }
-    }
+<div class="site-admin-usuarios">
+    <div class="body-content">
+        <h1 class="text-center mb-4"><i class="fas fa-users"></i> Administración de Usuarios</h1>
+        <p class="lead text-center mb-4">Gestiona los usuarios del sistema</p>
 
-    /* Estilos base para el modal y backdrop */
-    .modal-backdrop {
-        position: fixed !important;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: transparent !important;
-        z-index: 1040 !important;
-        pointer-events: none !important;
-    }
-
-    .modal {
-        z-index: 1050 !important;
-        padding-top: 80px !important;
-    }
-
-    .modal-dialog {
-        z-index: 1051 !important;
-    }
-
-    .modal-content {
-        z-index: 1052 !important;
-        position: relative;
-        background-color: #fff;
-        border-radius: 15px;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-    }
-
-    .modal-backdrop.show {
-        pointer-events: none !important;
-        background-color: transparent !important;
-    }
-
-    .modal, .modal-dialog, .modal-content {
-        pointer-events: auto !important;
-    }
-
-    .modal.fade .modal-dialog {
-        transform: scale(0.8);
-        transition: transform 0.3s ease-in-out;
-    }
-
-    .modal.show .modal-dialog {
-        transform: scale(1);
-    }
-
-    @media (max-width: 767px) {
-        .modal {
-            padding-top: 60px !important;
-        }
-        
-        .modal-dialog {
-            margin: 1rem;
-            max-width: calc(100% - 2rem);
-        }
-        
-        .modal-body {
-            padding: 1rem;
-            max-height: 80vh;
-        }
-        
-        .modal-header,
-        .modal-footer {
-            padding: 1rem;
-        }
-    }
-</style>
-
-<div class="container-fluid py-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="dashboard-card card mb-4">
-                <div class="card-header">
-                    <h6>Administración de Usuarios</h6>
-                </div>
-                <div class="card-body">
-                    <!-- Estadísticas Rápidas -->
-                    <div class="row mb-4">
-                        <div class="col-md-3">
-                            <div class="stats-card">
-                                <h3 class="stats-number"><?= count($usuarios) ?></h3>
-                                <p class="stats-label">Total de Usuarios</p>
-                                <small class="stats-detail">Registrados en el sistema</small>
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <div class="forum-container">
+                    <div class="forum-post">
+                        <!-- Estadísticas Rápidas -->
+                        <div class="stats-overview mb-4">
+                            <div class="row">
+                                <div class="col-md-6 col-lg-3 mb-3">
+                                    <div class="stats-card">
+                                        <h3 class="stats-number"><?= count($usuarios) ?></h3>
+                                        <p class="stats-label">Total</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-3 mb-3">
+                                    <div class="stats-card bg-danger">
+                                        <h3 class="stats-number"><?= count(array_filter($usuarios, fn($u) => $u->rol_id == 1313)) ?></h3>
+                                        <p class="stats-label">SUPERSU</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-3 mb-3">
+                                    <div class="stats-card bg-warning">
+                                        <h3 class="stats-number"><?= count(array_filter($usuarios, fn($u) => $u->rol_id == 1314)) ?></h3>
+                                        <p class="stats-label">ADMIN</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-3 mb-3">
+                                    <div class="stats-card bg-info">
+                                        <h3 class="stats-number"><?= count(array_filter($usuarios, fn($u) => $u->rol_id == 1315)) ?></h3>
+                                        <p class="stats-label">MOD</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
-                            <div class="stats-card">
-                                <h3 class="stats-number"><?= count(array_filter($usuarios, fn($u) => $u->rol_id == 1313)) ?></h3>
-                                <p class="stats-label">SUPERSU</p>
-                                <small class="stats-detail">Administradores principales</small>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stats-card">
-                                <h3 class="stats-number"><?= count(array_filter($usuarios, fn($u) => $u->rol_id == 1314)) ?></h3>
-                                <p class="stats-label">ADMIN</p>
-                                <small class="stats-detail">Administradores</small>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stats-card">
-                                <h3 class="stats-number"><?= count(array_filter($usuarios, fn($u) => $u->rol_id == 1315)) ?></h3>
-                                <p class="stats-label">MOD</p>
-                                <small class="stats-detail">Moderadores</small>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- Tabla de Usuarios -->
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Usuario</th>
-                                    <th>Rol Actual</th>
-                                    <th>Fecha de Registro</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($usuarios as $usuario): ?>
-                                    <tr>
-                                        <td><?= Html::encode($usuario->id) ?></td>
-                                        <td><?= Html::encode($usuario->user) ?></td>
-                                        <td>
-                                            <?php
-                                            $rolClass = '';
-                                            $rolText = '';
-                                            switch($usuario->rol_id) {
-                                                case 1313:
-                                                    $rolClass = 'bg-danger';
-                                                    $rolText = 'SUPERSU';
-                                                    break;
-                                                case 1314:
-                                                    $rolClass = 'bg-warning';
-                                                    $rolText = 'ADMIN';
-                                                    break;
-                                                case 1315:
-                                                    $rolClass = 'bg-info';
-                                                    $rolText = 'MOD';
-                                                    break;
-                                                case 1316:
-                                                    $rolClass = 'bg-success';
-                                                    $rolText = 'USER';
-                                                    break;
-                                                default:
-                                                    $rolClass = 'bg-secondary';
-                                                    $rolText = 'DESCONOCIDO';
-                                            }
-                                            ?>
-                                            <span class="badge <?= $rolClass ?>"><?= $rolText ?></span>
-                                        </td>
-                                        <td><?= Html::encode($usuario->created_at) ?></td>
-                                        <td>
-                                            <div class="btn-group">
-                                                <button type="button" class="btn btn-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                                                    <i class="fas fa-user-cog"></i> Cambiar Rol
-                                                </button>
-                                                <ul class="dropdown-menu">
-                                                    <li><a class="dropdown-item cambiar-rol" href="#" data-rol="1313"><i class="fas fa-crown"></i> SUPERSU</a></li>
-                                                    <li><a class="dropdown-item cambiar-rol" href="#" data-rol="1314"><i class="fas fa-shield-alt"></i> ADMIN</a></li>
-                                                    <li><a class="dropdown-item cambiar-rol" href="#" data-rol="1315"><i class="fas fa-user-shield"></i> MOD</a></li>
-                                                    <li><a class="dropdown-item cambiar-rol" href="#" data-rol="1316"><i class="fas fa-user"></i> USER</a></li>
-                                                </ul>
-                                                <button class="btn btn-danger btn-sm eliminar-usuario" data-id="<?= $usuario->id ?>">
-                                                    <i class="fas fa-trash"></i> Eliminar
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                        <!-- Tabla de Usuarios -->
+                        <div class="data-container">
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Usuario</th>
+                                            <th>Rol</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($usuarios as $usuario): ?>
+                                            <tr>
+                                                <td><?= Html::encode($usuario->id) ?></td>
+                                                <td><?= Html::encode($usuario->user) ?></td>
+                                                <td>
+                                                    <?php
+                                                    $rolClass = '';
+                                                    $rolText = '';
+                                                    switch($usuario->rol_id) {
+                                                        case 1313:
+                                                            $rolClass = 'bg-danger';
+                                                            $rolText = 'SUPERSU';
+                                                            break;
+                                                        case 1314:
+                                                            $rolClass = 'bg-warning';
+                                                            $rolText = 'ADMIN';
+                                                            break;
+                                                        case 1315:
+                                                            $rolClass = 'bg-info';
+                                                            $rolText = 'MOD';
+                                                            break;
+                                                        case 1316:
+                                                            $rolClass = 'bg-success';
+                                                            $rolText = 'USER';
+                                                            break;
+                                                        default:
+                                                            $rolClass = 'bg-secondary';
+                                                            $rolText = 'DESC';
+                                                    }
+                                                    ?>
+                                                    <span class="badge <?= $rolClass ?>"><?= $rolText ?></span>
+                                                </td>
+                                                <td>
+                                                    <div class="btn-group">
+                                                        <button type="button" class="btn btn-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                                            <i class="fas fa-user-cog"></i>
+                                                        </button>
+                                                        <ul class="dropdown-menu dropdown-menu-end">
+                                                            <li><a class="dropdown-item cambiar-rol" href="#" data-rol="1313" data-usuario="<?= $usuario->id ?>"><i class="fas fa-crown"></i> SUPERSU</a></li>
+                                                            <li><a class="dropdown-item cambiar-rol" href="#" data-rol="1314" data-usuario="<?= $usuario->id ?>"><i class="fas fa-shield-alt"></i> ADMIN</a></li>
+                                                            <li><a class="dropdown-item cambiar-rol" href="#" data-rol="1315" data-usuario="<?= $usuario->id ?>"><i class="fas fa-user-shield"></i> MOD</a></li>
+                                                            <li><a class="dropdown-item cambiar-rol" href="#" data-rol="1316" data-usuario="<?= $usuario->id ?>"><i class="fas fa-user"></i> USER</a></li>
+                                                            <li><hr class="dropdown-divider"></li>
+                                                            <li><a class="dropdown-item text-danger eliminar-usuario" href="#" data-id="<?= $usuario->id ?>"><i class="fas fa-trash"></i> Eliminar</a></li>
+                                                        </ul>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -334,7 +132,7 @@ $eliminarUsuarioUrl = Url::to(['site/eliminar-usuario']);
 
 <!-- Modal de confirmación -->
 <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="confirmModalLabel">Confirmar Acción</h5>
@@ -362,178 +160,274 @@ $eliminarUsuarioUrl = Url::to(['site/eliminar-usuario']);
     </div>
 </div>
 
-<?php
-$script = <<<JS
-    // Verificar que jQuery esté cargado
-    if (typeof jQuery === 'undefined') {
-        console.error('jQuery no está cargado!');
-    } else {
-        console.log('jQuery está cargado correctamente');
+<style>
+/* Estilos para tarjetas de estadísticas */
+.stats-card {
+    background: linear-gradient(45deg, #00b894, #00cec9);
+    color: white;
+    border-radius: 12px;
+    padding: 1rem;
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.stats-card.bg-danger {
+    background: linear-gradient(45deg, #d63031, #ff7675);
+}
+
+.stats-card.bg-warning {
+    background: linear-gradient(45deg, #fdcb6e, #ffeaa7);
+}
+
+.stats-card.bg-info {
+    background: linear-gradient(45deg, #0984e3, #74b9ff);
+}
+
+.stats-number {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.stats-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    margin: 0.25rem 0 0;
+}
+
+/* Estilos para la tabla */
+.data-container {
+    background-color: #fff;
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.table {
+    margin-bottom: 0;
+}
+
+.table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #6c5ce7;
+    border-top: none;
+    padding: 1rem;
+}
+
+.table td {
+    vertical-align: middle;
+    padding: 0.75rem 1rem;
+}
+
+.badge {
+    padding: 0.5em 0.8em;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 20px;
+}
+
+/* Estilos para botones y menús */
+.btn-group .btn {
+    padding: 0.4rem 0.7rem;
+    border-radius: 8px;
+}
+
+.dropdown-menu {
+    border-radius: 10px;
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 0.5rem 0;
+    min-width: 10rem;
+}
+
+.dropdown-item {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
+.dropdown-item i {
+    width: 20px;
+    text-align: center;
+    margin-right: 8px;
+}
+
+/* Estilos para el modal */
+.modal-content {
+    border-radius: 15px;
+    border: none;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+    border-bottom: 1px solid #f1f1f1;
+    padding: 1.25rem 1.5rem;
+}
+
+.modal-footer {
+    border-top: 1px solid #f1f1f1;
+    padding: 1.25rem 1.5rem;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+/* Toast */
+.toast {
+    background-color: #fff;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .stats-number {
+        font-size: 1.4rem;
     }
+    
+    .table th, .table td {
+        padding: 0.5rem;
+    }
+    
+    .btn-group .btn {
+        padding: 0.3rem 0.5rem;
+    }
+}
+</style>
 
-    // Variables globales
-    let confirmModal;
-    let resultToast;
-    let currentUsuarioId = null;
-    let currentRolId = null;
-
-    // URLs para las acciones
-    const cambiarRolUrl = '$cambiarRolUrl';
-    const eliminarUsuarioUrl = '$eliminarUsuarioUrl';
-
-    // Inicialización
-    $(document).ready(function() {
-        console.log('Documento listo, inicializando...');
-        
-        confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
-        resultToast = new bootstrap.Toast(document.getElementById('resultToast'));
-
-        // Manejar clic en cambiar rol
-        $(document).on('click', '.cambiar-rol', function(e) {
-            console.log('Click en cambiar rol detectado');
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Variables para los modales y toast
+    const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    const resultToast = new bootstrap.Toast(document.getElementById('resultToast'));
+    const confirmMessage = document.getElementById('confirmMessage');
+    const confirmButton = document.getElementById('confirmButton');
+    const resultMessage = document.getElementById('resultMessage');
+    
+    // Datos para la acción actual
+    let currentAction = '';
+    let currentUserId = '';
+    let currentRoleId = '';
+    
+    // Manejar clics en cambiar rol
+    document.querySelectorAll('.cambiar-rol').forEach(link => {
+        link.addEventListener('click', function(e) {
             e.preventDefault();
-            currentUsuarioId = $(this).closest('tr').find('td:first').text();
-            currentRolId = $(this).data('rol');
             
-            console.log('Usuario ID:', currentUsuarioId);
-            console.log('Rol ID:', currentRolId);
+            currentAction = 'cambiar-rol';
+            currentUserId = this.getAttribute('data-usuario');
+            currentRoleId = this.getAttribute('data-rol');
             
-            $('#confirmMessage').text('¿Estás seguro de que deseas cambiar el rol de este usuario?');
-            $('#confirmButton').off('click').on('click', function() {
-                console.log('Botón confirmar clickeado');
-                cambiarRol();
-            });
-            
+            // Mostrar mensaje de confirmación
+            confirmMessage.innerHTML = `¿Estás seguro de que deseas cambiar el rol del usuario ${currentUserId} a ${getRoleName(currentRoleId)}?`;
             confirmModal.show();
-        });
-
-        // Manejar clic en eliminar usuario
-        $(document).on('click', '.eliminar-usuario', function(e) {
-            console.log('Click en eliminar usuario detectado');
-            e.preventDefault();
-            currentUsuarioId = $(this).data('id');
-            
-            console.log('Usuario ID a eliminar:', currentUsuarioId);
-            
-            $('#confirmMessage').text('¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.');
-            $('#confirmButton').off('click').on('click', function() {
-                console.log('Botón confirmar clickeado');
-                eliminarUsuario();
-            });
-            
-            confirmModal.show();
-        });
-
-        // Limpiar modales y backdrops al cargar la página
-        $('.modal-backdrop').remove();
-        $('body').removeClass('modal-open');
-        
-        // Asegurar que los modales sean clickeables
-        $('.modal').css('pointer-events', 'auto');
-        $('.modal .modal-content').css('pointer-events', 'auto');
-        
-        // Manejar clics en los modales
-        $('.modal').on('click', function(e) {
-            e.stopPropagation();
-        });
-        
-        // Manejar clics en el contenido de los modales
-        $('.modal .modal-content').on('click', function(e) {
-            e.stopPropagation();
-        });
-        
-        // Manejar la apertura de modales
-        $('.modal').on('show.bs.modal', function() {
-            $('.modal-backdrop').remove();
-            
-            $('<div>')
-                .addClass('modal-backdrop fade show')
-                .css({
-                    'z-index': '1040',
-                    'background-color': 'transparent',
-                    'pointer-events': 'none'
-                })
-                .appendTo('body');
-        });
-        
-        // Manejar el cierre de modales
-        $('.modal').on('hidden.bs.modal', function() {
-            $('.modal-backdrop').remove();
-            $('body').removeClass('modal-open');
         });
     });
-
-    // Función para cambiar rol
-    function cambiarRol() {
-        console.log('Iniciando cambio de rol...');
-        console.log('Usuario ID:', currentUsuarioId);
-        console.log('Rol ID:', currentRolId);
-        console.log('URL:', cambiarRolUrl);
-        
-        $.ajax({
-            url: cambiarRolUrl,
-            type: 'POST',
-            data: {
-                usuario_id: currentUsuarioId,
-                rol_id: currentRolId,
-                _csrf: '$csrfToken'
-            },
-            success: function(response) {
-                console.log('Respuesta:', response);
-                confirmModal.hide();
-                showResult(response.message, response.success);
-                if (response.success) {
-                    setTimeout(() => location.reload(), 1500);
-                }
-            },
-            error: function(xhr, status, error) {
-                console.log('Error:', error);
-                console.log('Status:', status);
-                console.log('XHR:', xhr);
-                confirmModal.hide();
-                showResult('Error al procesar la solicitud: ' + error, false);
-            }
+    
+    // Manejar clics en eliminar usuario
+    document.querySelectorAll('.eliminar-usuario').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            currentAction = 'eliminar-usuario';
+            currentUserId = this.getAttribute('data-id');
+            
+            // Mostrar mensaje de confirmación
+            confirmMessage.innerHTML = `¿Estás seguro de que deseas eliminar al usuario ${currentUserId}? Esta acción no se puede deshacer.`;
+            confirmModal.show();
         });
-    }
-
-    // Función para eliminar usuario
-    function eliminarUsuario() {
-        console.log('Iniciando eliminación de usuario...');
-        console.log('Usuario ID:', currentUsuarioId);
-        console.log('URL:', eliminarUsuarioUrl);
+    });
+    
+    // Manejar clic en el botón de confirmación
+    confirmButton.addEventListener('click', function() {
+        // Ocultar el modal de confirmación
+        confirmModal.hide();
         
-        $.ajax({
-            url: eliminarUsuarioUrl,
-            type: 'POST',
-            data: {
-                usuario_id: currentUsuarioId,
-                _csrf: '$csrfToken'
-            },
-            success: function(response) {
-                console.log('Respuesta:', response);
-                confirmModal.hide();
-                showResult(response.message, response.success);
-                if (response.success) {
-                    setTimeout(() => location.reload(), 1500);
+        if (currentAction === 'cambiar-rol') {
+            // Realizar petición AJAX para cambiar el rol
+            fetch('<?= $cambiarRolUrl ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRF-Token': '<?= $csrfToken ?>'
+                },
+                body: `usuario_id=${currentUserId}&rol_id=${currentRoleId}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mostrar mensaje de éxito
+                    resultMessage.innerHTML = data.message || 'Rol cambiado con éxito.';
+                    resultToast.show();
+                    
+                    // Recargar la página después de un breve retraso
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    // Mostrar mensaje de error
+                    resultMessage.innerHTML = data.message || 'Error al cambiar el rol.';
+                    resultToast.show();
                 }
-            },
-            error: function(xhr, status, error) {
-                console.log('Error:', error);
-                console.log('Status:', status);
-                console.log('XHR:', xhr);
-                confirmModal.hide();
-                showResult('Error al procesar la solicitud: ' + error, false);
-            }
-        });
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                resultMessage.innerHTML = 'Error al procesar la solicitud.';
+                resultToast.show();
+            });
+        } else if (currentAction === 'eliminar-usuario') {
+            // Realizar petición AJAX para eliminar usuario
+            fetch('<?= $eliminarUsuarioUrl ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRF-Token': '<?= $csrfToken ?>'
+                },
+                body: `usuario_id=${currentUserId}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mostrar mensaje de éxito
+                    resultMessage.innerHTML = data.message || 'Usuario eliminado con éxito.';
+                    resultToast.show();
+                    
+                    // Recargar la página después de un breve retraso
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    // Mostrar mensaje de error
+                    resultMessage.innerHTML = data.message || 'Error al eliminar el usuario.';
+                    resultToast.show();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                resultMessage.innerHTML = 'Error al procesar la solicitud.';
+                resultToast.show();
+            });
+        }
+    });
+    
+    // Función auxiliar para obtener el nombre del rol
+    function getRoleName(roleId) {
+        switch(roleId) {
+            case '1313': return 'SUPERSU';
+            case '1314': return 'ADMIN';
+            case '1315': return 'MOD';
+            case '1316': return 'USER';
+            default: return 'Desconocido';
+        }
     }
-
-    // Función para mostrar resultados
-    function showResult(message, success) {
-        $('#resultMessage').text(message);
-        $('#resultToast').removeClass('bg-success bg-danger text-white')
-            .addClass(success ? 'bg-success text-white' : 'bg-danger text-white');
-        resultToast.show();
-    }
-JS;
-$this->registerJs($script);
-?> 
+});
+</script> 

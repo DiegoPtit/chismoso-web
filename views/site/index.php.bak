@@ -1,0 +1,1707 @@
+<?php
+/** @var yii\web\View $this */
+
+use app\models\Posts;
+use yii\helpers\Html;
+use yii\helpers\HtmlPurifier;
+
+$this->title = 'El Chismoso - Inicio';
+
+// Registrar los assets de SweetAlert2
+$this->registerJsFile('https://cdn.jsdelivr.net/npm/sweetalert2@11', ['position' => \yii\web\View::POS_HEAD]);
+
+// Generar la URL para el endpoint check-subscription
+$checkSubscriptionUrl = Yii::$app->urlManager->createUrl(['site/check-subscription']);
+
+// Almacenar el nombre del parámetro CSRF para usarlo en JavaScript
+$csrfParam = Yii::$app->request->csrfParam;
+
+// Obtener todos los posts que son publicaciones principales (padre_id = null)
+// ordenados por fecha de creación descendente
+$posts = Posts::find()
+    ->where(['padre_id' => null])
+    ->orderBy(['created_at' => SORT_DESC])
+    ->all();
+
+// Función recursiva para renderizar comentarios
+if (!function_exists('renderComentarios')) {
+    function renderComentarios($comentarios, $nivel = 0) {
+        if (empty($comentarios)) {
+            return '';
+        }
+        
+        $html = '';
+        foreach ($comentarios as $comentario) {
+            // Determinar el género para el icono del comentario
+            $commentIcon = 'fa-user';
+            switch ($comentario->genre) {
+                case 0: $commentIcon = 'fa-user'; break;
+                case 1: $commentIcon = 'fa-user-circle'; break;
+                case 2: $commentIcon = 'fa-user-tie'; break;
+            }
+            
+            // Determinar la clase del avatar según el rol_id del usuario del comentario
+            $commentRoleClass = '';
+            $comentarioRolId = $comentario->usuario->rol_id;
+            
+            if ($comentarioRolId == 1313) {
+                $commentRoleClass = 'superadmin';
+            } elseif ($comentarioRolId == 1314) {
+                $commentRoleClass = 'admin';
+            } elseif ($comentarioRolId == 1315) {
+                $commentRoleClass = 'mod';
+            } elseif ($comentarioRolId == 1316) {
+                switch ($comentario->genre) {
+                    case 0: $commentRoleClass = 'user-neutral'; break;
+                    case 1: $commentRoleClass = 'user-female'; break;
+                    case 2: $commentRoleClass = 'user-male'; break;
+                }
+            }
+            
+            $html .= '<div class="forum-comment nivel-' . $nivel . '">';
+            $html .= '<div class="forum-comment-header">';
+            $html .= '<div class="avatar small ' . $commentRoleClass . '">';
+            $html .= '<i class="fas ' . $commentIcon . '"></i>';
+            $html .= '</div>';
+            $html .= '<div class="comment-info">';
+            $html .= '<span class="username">Anónimo</span>';
+            $html .= '<span class="comment-date">';
+            $html .= '<i class="far fa-clock"></i> ';
+            $html .= Yii::$app->formatter->asRelativeTime($comentario->created_at);
+            if (isset($comentario->age)) {
+                $html .= '<span class="ms-2"><i class="fas fa-birthday-cake"></i> ' . $comentario->age . ' años</span>';
+            }
+            $html .= '</span>';
+            $html .= '</div>';
+            $html .= '<div class="post-stats">';
+            $html .= '<span class="stat-item"><i class="far fa-thumbs-up"></i> ' . ($comentario->likes ?? 0) . '</span>';
+            $html .= '<span class="stat-item"><i class="far fa-thumbs-down"></i> ' . ($comentario->dislikes ?? 0) . '</span>';
+            $html .= '<span class="stat-item"><i class="far fa-comment"></i> ' . (count($comentario->subcomentarios ?? [])) . '</span>';
+            $html .= '</div>';
+            $html .= '</div>';
+            
+            // Procesar contenido
+            $contenido = HtmlPurifier::process($comentario->contenido);
+            $longitud = mb_strlen(strip_tags($contenido));
+            $esLargo = $longitud > 300;
+            
+            $html .= '<div class="forum-comment-content' . ($esLargo ? ' expandable' : '') . '">';
+            if ($esLargo) {
+                $html .= '<div class="content-preview">' . mb_substr(strip_tags($contenido), 0, 300) . '...</div>';
+                $html .= '<div class="content-full" style="display: none;">' . $contenido . '</div>';
+                $html .= '<button class="btn-ver-mas" data-action="expand">Ver más</button>';
+            } else {
+                $html .= $contenido;
+            }
+            $html .= '</div>';
+            
+            // Mostrar imágenes adjuntas si existen
+            if ($comentario->img_routes) {
+                try {
+                    $images = json_decode($comentario->img_routes, true);
+                    if (is_array($images) && !empty($images)) {
+                        $html .= '<div class="post-images mt-2 mb-2">';
+                        foreach ($images as $image) {
+                            if (isset($image['file'])) {
+                                $html .= '<div class="post-image-item">';
+                                $html .= Html::img(Yii::getAlias('@web') . $image['file'], [
+                                    'alt' => 'Imagen adjunta',
+                                    'class' => 'img-fluid post-image',
+                                    'data-bs-toggle' => 'modal',
+                                    'data-bs-target' => '#imageModal',
+                                    'data-img-src' => Yii::getAlias('@web') . $image['file']
+                                ]);
+                                $html .= '</div>';
+                            }
+                        }
+                        $html .= '</div>';
+                    }
+                } catch (\Exception $e) {
+                    // Si hay un error al procesar JSON, lo ignoramos
+                    Yii::error('Error al procesar imágenes de comentario #' . $comentario->id . ': ' . $e->getMessage());
+                }
+            }
+            
+            // Botones de acción para los comentarios
+            $html .= '<div class="forum-comment-actions">';
+            $html .= '<button type="button" class="btn-forum like-button" data-post-id="' . $comentario->id . '">';
+            $html .= '<i class="far fa-thumbs-up"></i> Me gusta';
+            $html .= '</button>';
+            $html .= '<button type="button" class="btn-forum dislike-button" data-post-id="' . $comentario->id . '">';
+            $html .= '<i class="far fa-thumbs-down"></i> No me gusta';
+            $html .= '</button>';
+            $html .= '<button type="button" class="btn-forum reply-button" data-post-id="' . $comentario->id . '">';
+            $html .= '<i class="far fa-comment"></i> Responder';
+            $html .= '</button>';
+            $html .= '</div>';
+            
+            // Formulario de respuesta para comentarios
+            $html .= '<div class="comment-form-container" id="form-comment-' . $comentario->id . '" style="display: none;">';
+            $html .= '<form class="comment-form" action="' . Yii::$app->urlManager->createUrl(['site/comentar']) . '" method="post">';
+            $html .= '<input type="hidden" name="' . Yii::$app->request->csrfParam . '" value="' . Yii::$app->request->csrfToken . '">';
+            $html .= '<input type="hidden" name="padre_id" value="' . $comentario->id . '">';
+            $html .= '<div class="form-group">';
+            $html .= '<label for="age-comment-' . $comentario->id . '">Edad (opcional)</label>';
+            $html .= '<input type="number" id="age-comment-' . $comentario->id . '" name="age" min="13" max="100" class="form-control">';
+            $html .= '</div>';
+            $html .= '<div class="form-group">';
+            $html .= '<label for="genre-comment-' . $comentario->id . '">Género (opcional)</label>';
+            $html .= '<select id="genre-comment-' . $comentario->id . '" name="genre" class="form-control">';
+            $html .= '<option value="0">Prefiero no decir</option>';
+            $html .= '<option value="1">Hombre</option>';
+            $html .= '<option value="2">Mujer</option>';
+            $html .= '</select>';
+            $html .= '</div>';
+            $html .= '<div class="form-group">';
+            $html .= '<label for="content-comment-' . $comentario->id . '">Respuesta</label>';
+            $html .= '<textarea id="content-comment-' . $comentario->id . '" name="contenido" class="form-control" maxlength="480" rows="3" required></textarea>';
+            $html .= '<small class="character-count">0/480 caracteres</small>';
+            $html .= '</div>';
+            $html .= '<div class="form-group">';
+            $html .= '<button type="submit" class="btn btn-primary">Publicar</button>';
+            $html .= '<button type="button" class="btn btn-secondary cancel-comment">Cancelar</button>';
+            $html .= '</div>';
+            $html .= '</form>';
+            $html .= '</div>';
+            
+            // Si tiene subcomentarios, renderizarlos recursivamente
+            if (!empty($comentario->subcomentarios)) {
+                $html .= '<div class="comments-nested">';
+                $html .= '<div class="forum-comments-header" id="subcomments-toggle-' . $comentario->id . '">';
+                $html .= '<i class="fas fa-comments"></i> ';
+                $html .= '<span>Ver ' . count($comentario->subcomentarios) . ' respuestas</span>';
+                $html .= '</div>';
+                $html .= '<div class="comments-list" id="subcomments-container-' . $comentario->id . '" style="display: none;">';
+                $html .= renderComentarios($comentario->subcomentarios, $nivel + 1);
+                $html .= '</div>';
+                $html .= '</div>';
+            }
+            
+            $html .= '</div>';
+        }
+        
+        return $html;
+    }
+}
+?>
+
+<div class="site-index">
+    <div class="body-content">
+        <h1 class="text-center mb-4"><i class="fas fa-comments"></i> El Chismoso</h1>
+        <p class="lead text-center mb-4">Comparte tus chismes favoritos de forma anónima</p>
+
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <?php if (empty($posts)): ?>
+                    <div class="alert alert-info text-center">
+                        <i class="fas fa-info-circle"></i> No hay chismes publicados todavía. ¡Sé el primero en compartir!
+                    </div>
+                <?php else: ?>
+                    <div class="forum-container">
+                        <?php foreach ($posts as $post): ?>
+                            <div class="forum-post">
+                                <div class="forum-post-header">
+                                    <?php 
+                                    // Determinar el género para el icono
+                                    $genreIcon = 'fa-user';
+                                    switch ($post->genre) {
+                                        case 0: $genreIcon = 'fa-user'; break;
+                                        case 1: $genreIcon = 'fa-user-circle'; break;
+                                        case 2: $genreIcon = 'fa-user-tie'; break;
+                                    }
+                                    
+                                    // Determinar la clase del avatar según el rol_id del usuario
+                                    $userRoleClass = '';
+                                    $rolId = $post->usuario->rol_id;
+                                    
+                                    if ($rolId == 1313) {
+                                        $userRoleClass = 'superadmin'; // Amarillo
+                                    } elseif ($rolId == 1314) {
+                                        $userRoleClass = 'admin'; // Naranja
+                                    } elseif ($rolId == 1315) {
+                                        $userRoleClass = 'mod'; // Verde
+                                    } elseif ($rolId == 1316) {
+                                        // Para usuarios normales, el color depende del género
+                                        switch ($post->genre) {
+                                            case 0: $userRoleClass = 'user-neutral'; break; // Gris
+                                            case 1: $userRoleClass = 'user-female'; break;  // Azul
+                                            case 2: $userRoleClass = 'user-male'; break;    // Rosado
+                                        }
+                                    }
+                                    ?>
+                                    <div class="avatar <?= $userRoleClass ?>">
+                                        <i class="fas <?= $genreIcon ?>"></i>
+                                    </div>
+                                    <div class="post-info">
+                                        <span class="username">Anónimo</span>
+                                        <span class="post-date">
+                                            <i class="far fa-clock"></i> 
+                                            <?= Yii::$app->formatter->asRelativeTime($post->created_at) ?>
+                                            <?php if (isset($post->age)): ?>
+                                                <span class="ms-2"><i class="fas fa-birthday-cake"></i> <?= $post->age ?> años</span>
+                                            <?php endif; ?>
+                                        </span>
+                                    </div>
+                                    <div class="post-stats">
+                                        <span class="stat-item"><i class="far fa-thumbs-up"></i> <?= $post->likes ?? 0 ?></span>
+                                        <span class="stat-item"><i class="far fa-thumbs-down"></i> <?= $post->dislikes ?? 0 ?></span>
+                                        <span class="stat-item"><i class="far fa-comment"></i> <?= count($post->subcomentarios ?? []) ?></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="forum-post-content">
+                                    <?php 
+                                    $contenido = HtmlPurifier::process($post->contenido);
+                                    $longitud = mb_strlen(strip_tags($contenido));
+                                    $esLargo = $longitud > 300;
+                                    
+                                    if ($esLargo): ?>
+                                        <div class="expandable">
+                                            <div class="content-preview"><?= mb_substr(strip_tags($contenido), 0, 300) ?>...</div>
+                                            <div class="content-full" style="display: none;"><?= $contenido ?></div>
+                                            <button class="btn-ver-mas" data-action="expand">Ver más</button>
+                                        </div>
+                                    <?php else: ?>
+                                        <?= $contenido ?>
+                                    <?php endif; ?>
+                                    
+                                    <?php
+                                    // Mostrar imágenes adjuntas si existen
+                                    if ($post->img_routes) {
+                                        try {
+                                            $images = json_decode($post->img_routes, true);
+                                            if (is_array($images) && !empty($images)) {
+                                                echo '<div class="post-carousel-container">';
+                                                echo '<div class="post-carousel">';
+                                                echo '<div class="post-carousel-inner" id="carousel-' . $post->id . '">';
+                                                
+                                                $imageCount = 0;
+                                                foreach ($images as $image) {
+                                                    if (isset($image['file'])) {
+                                                        echo '<div class="carousel-item" data-index="' . $imageCount . '">';
+                                                        echo Html::img(Yii::getAlias('@web') . $image['file'], [
+                                                            'alt' => 'Imagen adjunta',
+                                                            'class' => 'img-fluid',
+                                                            'data-img-src' => Yii::getAlias('@web') . $image['file']
+                                                        ]);
+                                                        echo '</div>';
+                                                        $imageCount++;
+                                                    }
+                                                }
+                                                
+                                                echo '</div>'; // fin post-carousel-inner
+                                                
+                                                // Solo mostrar controles si hay más de una imagen
+                                                if (count($images) > 1) {
+                                                    echo '<button class="carousel-control prev" data-carousel="carousel-' . $post->id . '">';
+                                                    echo '<i class="fas fa-chevron-left"></i>';
+                                                    echo '</button>';
+                                                    
+                                                    echo '<button class="carousel-control next" data-carousel="carousel-' . $post->id . '">';
+                                                    echo '<i class="fas fa-chevron-right"></i>';
+                                                    echo '</button>';
+                                                    
+                                                    echo '<div class="carousel-indicators">';
+                                                    for ($i = 0; $i < $imageCount; $i++) {
+                                                        $activeClass = ($i === 0) ? 'active' : '';
+                                                        echo '<div class="carousel-indicator ' . $activeClass . '" data-carousel="carousel-' . $post->id . '" data-slide-to="' . $i . '"></div>';
+                                                    }
+                                                    echo '</div>';
+                                                }
+                                                
+                                                echo '</div>'; // fin post-carousel
+                                                echo '</div>'; // fin post-carousel-container
+                                            }
+                                        } catch (\Exception $e) {
+                                            // Si hay un error al procesar JSON, lo ignoramos
+                                            Yii::error('Error al procesar imágenes de post #' . $post->id . ': ' . $e->getMessage());
+                                        }
+                                    }
+                                    ?>
+                                </div>
+                                
+                                <div class="forum-post-actions">
+                                    <button type="button" class="btn-forum like-button" data-post-id="<?= $post->id ?>">
+                                        <i class="far fa-thumbs-up"></i> Me gusta
+                                    </button>
+                                    <button type="button" class="btn-forum dislike-button" data-post-id="<?= $post->id ?>">
+                                        <i class="far fa-thumbs-down"></i> No me gusta
+                                    </button>
+                                    <button type="button" class="btn-forum comment-button" data-post-id="<?= $post->id ?>">
+                                        <i class="far fa-comment"></i> Comentar
+                                    </button>
+                                </div>
+                                
+                                <!-- Formulario para comentar en posts -->
+                                <div class="comment-form-container" id="form-post-<?= $post->id ?>" style="display: none;">
+                                    <form class="comment-form" action="<?= Yii::$app->urlManager->createUrl(['site/comentar']) ?>" method="post">
+                                        <input type="hidden" name="<?= Yii::$app->request->csrfParam ?>" value="<?= Yii::$app->request->csrfToken ?>">
+                                        <input type="hidden" name="padre_id" value="<?= $post->id ?>">
+                                        <div class="form-group">
+                                            <label for="age-post-<?= $post->id ?>">Edad (opcional)</label>
+                                            <input type="number" id="age-post-<?= $post->id ?>" name="age" min="13" max="100" class="form-control">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="genre-post-<?= $post->id ?>">Género (opcional)</label>
+                                            <select id="genre-post-<?= $post->id ?>" name="genre" class="form-control">
+                                                <option value="0">Prefiero no decir</option>
+                                                <option value="1">Hombre</option>
+                                                <option value="2">Mujer</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="content-post-<?= $post->id ?>">Comentario</label>
+                                            <textarea id="content-post-<?= $post->id ?>" name="contenido" class="form-control" maxlength="480" rows="3" required></textarea>
+                                            <small class="character-count">0/480 caracteres</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <button type="submit" class="btn btn-primary">Publicar</button>
+                                            <button type="button" class="btn btn-secondary cancel-comment">Cancelar</button>
+                                        </div>
+                                    </form>
+                                </div>
+
+                                <?php if ($post->subcomentarios): ?>
+                                <div class="forum-comments">
+                                    <div class="forum-comments-header" id="comments-toggle-<?= $post->id ?>">
+                                        <i class="fas fa-comments"></i> 
+                                        <span>Ver <?= count($post->subcomentarios) ?> comentarios</span>
+                                    </div>
+                                    
+                                    <div class="comments-list" id="comments-container-<?= $post->id ?>" style="display: none;">
+                                        <?= renderComentarios($post->subcomentarios) ?>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Estilos tipo foro */
+.forum-container {
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    border: 1px solid #e0e0e0;
+}
+
+.forum-post {
+    padding: 15px;
+    border-bottom: 1px solid #e0e0e0;
+    background-color: #fff;
+}
+
+.forum-post:last-child {
+    border-bottom: none;
+}
+
+.forum-post-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    color: white;
+    flex-shrink: 0;
+}
+
+/* Estilos para los avatares según rol_id */
+.avatar.superadmin {
+    background-color: #ffc107; /* Amarillo */
+}
+
+.avatar.admin {
+    background-color: #fd7e14; /* Naranja */
+}
+
+.avatar.mod {
+    background-color: #28a745; /* Verde */
+}
+
+.avatar.user-neutral {
+    background-color: #6c757d; /* Gris */
+}
+
+.avatar.user-female {
+    background-color: #007bff; /* Azul */
+}
+
+.avatar.user-male {
+    background-color: #e83e8c; /* Rosado */
+}
+
+.avatar.small {
+    width: 30px;
+    height: 30px;
+    font-size: 0.8rem;
+}
+
+.post-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.username {
+    font-weight: 600;
+    color: #444;
+    font-size: 0.9rem;
+}
+
+.post-date, .comment-date {
+    color: #777;
+    font-size: 0.8rem;
+}
+
+.post-stats {
+    display: flex;
+    color: #666;
+    font-size: 0.85rem;
+}
+
+.stat-item {
+    margin-left: 10px;
+}
+
+.forum-post-content {
+    margin-bottom: 15px;
+    color: #333;
+    line-height: 1.5;
+    padding-left: 50px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.forum-post-actions {
+    padding-left: 50px;
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.btn-forum {
+    border: none;
+    background: #f1f1f1;
+    color: #555;
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-forum:hover {
+    background: #e5e5e5;
+}
+
+.btn-forum.like-button:hover {
+    color: #4267B2;
+}
+
+.btn-forum.dislike-button:hover {
+    color: #e74c3c;
+}
+
+.btn-forum.active,
+.btn-forum.like-button.active {
+    background: #e9f5ff;
+    color: #4267B2;
+    transform: scale(1.05);
+    transition: all 0.2s;
+}
+
+.btn-forum.dislike-button.active {
+    background: #ffeeee;
+    color: #e74c3c;
+    transform: scale(1.05);
+    transition: all 0.2s;
+}
+
+.forum-comments {
+    padding-left: 50px;
+    margin-top: 15px;
+    border-top: 1px solid #f1f1f1;
+    padding-top: 10px;
+}
+
+.forum-comments-header {
+    color: #6c5ce7;
+    cursor: pointer;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+
+.forum-comments-header:hover {
+    text-decoration: underline;
+}
+
+.comments-list {
+    background-color: #f9f9f9;
+    border-radius: 3px;
+    border-left: 3px solid #e0e0e0;
+    margin-top: 5px;
+}
+
+.forum-comment {
+    padding: 10px;
+    border-bottom: 1px solid #e9e9e9;
+}
+
+.forum-comment:last-child {
+    border-bottom: none;
+}
+
+.forum-comment-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.comment-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.forum-comment-content {
+    padding-left: 40px;
+    color: #444;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+    line-height: 1.5;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.forum-comment-actions {
+    padding-left: 40px;
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.comments-nested {
+    margin-left: 30px;
+    margin-top: 10px;
+    border-left: 2px solid #e0e0e0;
+    padding-left: 10px;
+}
+
+.nivel-1 {
+    border-left-color: #6c5ce7;
+}
+
+.nivel-2 {
+    border-left-color: #fd79a8;
+}
+
+.nivel-3 {
+    border-left-color: #00b894;
+}
+
+.nivel-4 {
+    border-left-color: #fdcb6e;
+}
+
+.nivel-5 {
+    border-left-color: #e17055;
+}
+
+@media (max-width: 768px) {
+    .forum-post-header, .forum-comment-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .post-stats {
+        margin-top: 5px;
+        margin-left: 50px;
+    }
+    
+    .forum-post-content, 
+    .forum-post-actions,
+    .forum-comments,
+    .forum-comment-content,
+    .forum-comment-actions {
+        padding-left: 0;
+    }
+}
+
+/* Estilos para formularios de comentarios */
+.comment-form-container {
+    margin: 10px 0;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #e9ecef;
+}
+
+.comments-nested .comment-form-container {
+    margin-left: 40px;
+}
+
+.comment-form .form-group {
+    margin-bottom: 10px;
+}
+
+.comment-form label {
+    font-weight: 500;
+    font-size: 0.85rem;
+    color: #495057;
+}
+
+.comment-form .form-control {
+    border: 1px solid #ced4da;
+    border-radius: 3px;
+    font-size: 0.9rem;
+}
+
+.comment-form textarea {
+    resize: vertical;
+    min-height: 70px;
+}
+
+.character-count {
+    display: block;
+    text-align: right;
+    color: #6c757d;
+    font-size: 0.75rem;
+    margin-top: 3px;
+}
+
+.comment-form .btn {
+    padding: 5px 15px;
+    font-size: 0.85rem;
+}
+
+.comment-form .btn-primary {
+    background-color: #6c5ce7;
+    border-color: #6c5ce7;
+}
+
+.comment-form .btn-primary:hover {
+    background-color: #5f4dd0;
+    border-color: #5f4dd0;
+}
+
+.comment-form .btn-secondary {
+    background-color: #e9ecef;
+    border-color: #e9ecef;
+    color: #495057;
+}
+
+.comment-form .btn-secondary:hover {
+    background-color: #dee2e6;
+    border-color: #dee2e6;
+}
+
+/* Estilos para el carrusel de imágenes */
+.post-carousel-container {
+    position: relative;
+    width: 100%;
+    margin: 15px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.post-carousel {
+    width: 100%;
+    position: relative;
+    display: flex;
+    overflow: hidden;
+}
+
+.post-carousel-inner {
+    display: flex;
+    transition: transform 0.5s ease;
+    width: 100%;
+    flex-wrap: nowrap;
+}
+
+.carousel-item {
+    min-width: 100%;
+    flex: 0 0 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f8f8f8;
+}
+
+.carousel-item img {
+    max-width: 100%;
+    max-height: 400px;
+    object-fit: contain;
+}
+
+.carousel-control {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    background-color: rgba(255, 255, 255, 0.7);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 10;
+    color: #333;
+    border: none;
+}
+
+.carousel-control.prev {
+    left: 10px;
+}
+
+.carousel-control.next {
+    right: 10px;
+}
+
+.post-carousel-container:hover .carousel-control {
+    opacity: 1;
+}
+
+.carousel-indicators {
+    position: absolute;
+    bottom: 10px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.carousel-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.5);
+    margin: 0 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.carousel-indicator.active {
+    background-color: white;
+    transform: scale(1.2);
+}
+
+/* Para una sola imagen, que ocupe más espacio */
+.post-images:has(.post-image-item:only-child) .post-image-item {
+    flex: 0 0 auto;
+    max-width: 250px;
+}
+
+.post-images:has(.post-image-item:only-child) .post-image {
+    max-width: 250px;
+    max-height: 250px;
+    object-fit: contain;
+}
+
+/* Estilos para la funcionalidad "Ver más" */
+.expandable {
+    position: relative;
+}
+
+.content-preview {
+    margin-bottom: 5px;
+}
+
+.btn-ver-mas {
+    background: none;
+    border: none;
+    color: #6c5ce7;
+    padding: 0;
+    font-size: 0.85rem;
+    cursor: pointer;
+    margin-top: 5px;
+    font-weight: 500;
+}
+
+.btn-ver-mas:hover {
+    text-decoration: underline;
+}
+
+.content-full {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle para mostrar/ocultar comentarios principales
+    const posts = document.querySelectorAll('.forum-post');
+    
+    posts.forEach(post => {
+        const commentsToggle = post.querySelector('.forum-comments-header');
+        if (commentsToggle) {
+            const commentsContainer = commentsToggle.nextElementSibling;
+            const toggleText = commentsToggle.querySelector('span');
+            const commentCount = commentsContainer.querySelectorAll('.forum-comment').length;
+            
+            commentsToggle.addEventListener('click', function() {
+                if (commentsContainer.style.display === 'none') {
+                    commentsContainer.style.display = 'block';
+                    toggleText.textContent = 'Ocultar comentarios';
+                } else {
+                    commentsContainer.style.display = 'none';
+                    toggleText.textContent = 'Ver ' + commentCount + ' comentarios';
+                }
+            });
+        }
+    });
+    
+    // Toggle para mostrar/ocultar subcomentarios
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.forum-comments-header')) {
+            const header = e.target.closest('.forum-comments-header');
+            if (header.id && header.id.startsWith('subcomments-toggle-')) {
+                const commentId = header.id.replace('subcomments-toggle-', '');
+                const container = document.getElementById('subcomments-container-' + commentId);
+                const toggleText = header.querySelector('span');
+                
+                if (container) {
+                    if (container.style.display === 'none') {
+                        container.style.display = 'block';
+                        toggleText.textContent = 'Ocultar respuestas';
+                    } else {
+                        container.style.display = 'none';
+                        const commentCount = container.querySelectorAll('.forum-comment').length;
+                        toggleText.textContent = 'Ver ' + commentCount + ' respuestas';
+                    }
+                }
+            }
+        }
+    });
+    
+    // Funcionalidad de carrusel para imágenes
+    const carouselInners = document.querySelectorAll('.post-carousel-inner');
+    carouselInners.forEach(carousel => {
+        // Inicializar variables para el carrusel
+        let currentSlide = 0;
+        const slides = carousel.querySelectorAll('.carousel-item');
+        const totalSlides = slides.length;
+        const carouselId = carousel.id;
+        
+        if (totalSlides <= 1) return; // No necesitamos inicializar para una sola imagen
+        
+        // Función para mostrar la diapositiva actual
+        function showSlide(index) {
+            // Asegurar que el índice esté dentro de los límites
+            if (index < 0) index = totalSlides - 1;
+            if (index >= totalSlides) index = 0;
+            
+            currentSlide = index;
+            
+            // Mover el carrusel
+            carousel.style.transform = `translateX(-${currentSlide * 100}%)`;
+            
+            // Actualizar indicadores
+            const indicators = document.querySelectorAll(`.carousel-indicator[data-carousel="${carouselId}"]`);
+            indicators.forEach((indicator, i) => {
+                if (i === currentSlide) {
+                    indicator.classList.add('active');
+                } else {
+                    indicator.classList.remove('active');
+                }
+            });
+        }
+        
+        // Escuchar clics en los controles de navegación
+        document.querySelectorAll(`.carousel-control[data-carousel="${carouselId}"]`).forEach(control => {
+            control.addEventListener('click', function() {
+                if (this.classList.contains('next')) {
+                    showSlide(currentSlide + 1);
+                } else {
+                    showSlide(currentSlide - 1);
+                }
+            });
+        });
+        
+        // Escuchar clics en los indicadores
+        document.querySelectorAll(`.carousel-indicator[data-carousel="${carouselId}"]`).forEach((indicator, index) => {
+            indicator.addEventListener('click', function() {
+                showSlide(index);
+            });
+        });
+        
+        // Inicializar el carrusel
+        showSlide(0);
+    });
+    
+    // Funcionalidad para los botones de like y dislike
+    const likeButtons = document.querySelectorAll('.like-button');
+    const dislikeButtons = document.querySelectorAll('.dislike-button');
+    
+    likeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const postId = this.getAttribute('data-post-id');
+            const isComment = this.closest('.forum-comment') !== null;
+            const elementType = isComment ? '.forum-comment' : '.forum-post';
+            const element = this.closest(elementType);
+            
+            // URL para la acción AJAX dependiendo si es comentario o post
+            const likeUrl = isComment 
+                ? '<?= Yii::$app->urlManager->createUrl(['site/like-comment', 'id' => '']) ?>' + postId
+                : '<?= Yii::$app->urlManager->createUrl(['site/like', 'id' => '']) ?>' + postId;
+            
+            // Encontrar el contador de likes
+            const likeCount = element.querySelector('.post-stats .stat-item:first-child') || 
+                             document.createElement('span');
+            
+            // Cambio visual para confirmar la acción
+            this.classList.add('active');
+            
+            // Realizar la petición AJAX
+            fetch(likeUrl, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token': '<?= Yii::$app->request->getCsrfToken() ?>'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Actualizar el contador visual
+                    likeCount.innerHTML = '<i class="far fa-thumbs-up"></i> ' + data.count;
+                } else {
+                    // Mostrar mensaje de error
+                    alert(data.message || 'Ocurrió un error al procesar tu solicitud');
+                }
+                
+                // Quitar clase active después de un tiempo
+                setTimeout(() => {
+                    this.classList.remove('active');
+                }, 500);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Ocurrió un error al procesar tu solicitud');
+                this.classList.remove('active');
+            });
+        });
+    });
+    
+    dislikeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const postId = this.getAttribute('data-post-id');
+            const isComment = this.closest('.forum-comment') !== null;
+            const elementType = isComment ? '.forum-comment' : '.forum-post';
+            const element = this.closest(elementType);
+            
+            // URL para la acción AJAX dependiendo si es comentario o post
+            const dislikeUrl = isComment 
+                ? '<?= Yii::$app->urlManager->createUrl(['site/dislike-comment', 'id' => '']) ?>' + postId
+                : '<?= Yii::$app->urlManager->createUrl(['site/dislike', 'id' => '']) ?>' + postId;
+            
+            // Encontrar el contador de dislikes
+            const dislikeCount = element.querySelector('.post-stats .stat-item:nth-child(2)') || 
+                               document.createElement('span');
+            
+            // Cambio visual para confirmar la acción
+            this.classList.add('active');
+            
+            // Realizar la petición AJAX
+            fetch(dislikeUrl, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token': '<?= Yii::$app->request->getCsrfToken() ?>'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Actualizar el contador visual
+                    dislikeCount.innerHTML = '<i class="far fa-thumbs-down"></i> ' + data.count;
+                } else {
+                    // Mostrar mensaje de error
+                    alert(data.message || 'Ocurrió un error al procesar tu solicitud');
+                }
+                
+                // Quitar clase active después de un tiempo
+                setTimeout(() => {
+                    this.classList.remove('active');
+                }, 500);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Ocurrió un error al procesar tu solicitud');
+                this.classList.remove('active');
+            });
+        });
+    });
+    
+    // Mostrar formulario de comentarios para posts
+    const commentButtons = document.querySelectorAll('.comment-button');
+    
+    commentButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const postId = this.getAttribute('data-post-id');
+            const formContainer = document.getElementById('form-post-' + postId);
+            
+            if (formContainer) {
+                formContainer.style.display = formContainer.style.display === 'none' ? 'block' : 'none';
+                
+                // Ocultar otros formularios abiertos
+                document.querySelectorAll('.comment-form-container').forEach(container => {
+                    if (container !== formContainer && container.style.display !== 'none') {
+                        container.style.display = 'none';
+                    }
+                });
+            }
+        });
+    });
+    
+    // Mostrar formulario de respuesta para comentarios
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.reply-button')) {
+            const button = e.target.closest('.reply-button');
+            const postId = button.getAttribute('data-post-id');
+            const formContainer = document.getElementById('form-comment-' + postId);
+            
+            if (formContainer) {
+                formContainer.style.display = formContainer.style.display === 'none' ? 'block' : 'none';
+                
+                // Ocultar otros formularios abiertos
+                document.querySelectorAll('.comment-form-container').forEach(container => {
+                    if (container !== formContainer && container.style.display !== 'none') {
+                        container.style.display = 'none';
+                    }
+                });
+            }
+        }
+    });
+    
+    // Manejar botones de cancelar
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('cancel-comment')) {
+            const formContainer = e.target.closest('.comment-form-container');
+            if (formContainer) {
+                formContainer.style.display = 'none';
+                // Limpiar el formulario
+                const form = formContainer.querySelector('form');
+                if (form) form.reset();
+            }
+        }
+    });
+    
+    // Contador de caracteres para textareas
+    document.addEventListener('input', function(e) {
+        if (e.target.tagName === 'TEXTAREA') {
+            const maxLength = e.target.getAttribute('maxlength');
+            const currentLength = e.target.value.length;
+            const countDisplay = e.target.nextElementSibling;
+            
+            if (countDisplay && countDisplay.classList.contains('character-count')) {
+                countDisplay.textContent = currentLength + '/' + maxLength + ' caracteres';
+                
+                // Cambiar color cuando se acerca al límite
+                if (currentLength > maxLength * 0.8) {
+                    countDisplay.style.color = '#e74c3c';
+                } else {
+                    countDisplay.style.color = '#6c757d';
+                }
+            }
+        }
+    });
+    
+    // Validación de formulario y envío AJAX
+    document.addEventListener('submit', function(e) {
+        if (e.target.classList.contains('comment-form')) {
+            e.preventDefault();
+            
+            const form = e.target;
+            const textarea = form.querySelector('textarea');
+            var contenido = textarea.value.trim();
+            
+            if (!contenido) {
+                textarea.classList.add('is-invalid');
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Campo requerido',
+                    text: 'El contenido del comentario no puede estar vacío'
+                });
+                return;
+            }
+            
+            // Verificar límite de caracteres según suscripción
+            if (contenido.length > maxChars) {
+                textarea.classList.add('is-invalid');
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Límite excedido',
+                    text: 'El contenido no puede exceder los ' + maxChars + ' caracteres con tu suscripción actual.'
+                });
+                return;
+            }
+            
+            // Obtener el ID del padre
+            var padreIdInput = form.find('input[name="padre_id"]');
+            if (padreIdInput.length === 0 || !padreIdInput.val()) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Falta el ID del post o comentario padre'
+                });
+                return;
+            }
+            
+            // Deshabilitar botón de envío y mostrar indicador de carga
+            var submitBtn = form.find('button[type="submit"]');
+            var originalText = submitBtn.html();
+            submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Enviando...');
+            
+            // Crear FormData manualmente con los campos exactos que necesitamos
+            var formData = new FormData();
+            
+            // Añadir CSRF token
+            var csrfToken = form.find('input[name="' + csrfParam + '"]');
+            if (csrfToken.length > 0) {
+                formData.append(csrfToken.attr('name'), csrfToken.val());
+            }
+            
+            // Añadir campos principales
+            formData.append('padre_id', padreIdInput.val());
+            formData.append('contenido', contenido);
+            
+            // Añadir campos opcionales si existen
+            var ageInput = form.find('input[name="age"]');
+            if (ageInput.length > 0 && ageInput.val()) {
+                formData.append('age', ageInput.val());
+            }
+            
+            var genreSelect = form.find('select[name="genre"]');
+            if (genreSelect.length > 0) {
+                formData.append('genre', genreSelect.val());
+            }
+            
+            $.ajax({
+                url: form.attr('action'),
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    submitBtn.prop('disabled', false).html(originalText);
+                    
+                    if (response.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: '¡Éxito!',
+                            text: response.message,
+                            showConfirmButton: false,
+                            timer: 1500
+                        }).then(function() {
+                            // Ocultar formulario y recargar
+                            form[0].reset();
+                            form.closest('.comment-form-container').slideUp();
+                            window.location.reload();
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: response.message || 'Error al procesar la solicitud'
+                        });
+                        
+                        if (response.redirect) {
+                            setTimeout(function() {
+                                window.location.href = response.redirect;
+                            }, 1500);
+                        }
+                    }
+                },
+                error: function() {
+                    submitBtn.prop('disabled', false).html(originalText);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'Ocurrió un error al enviar el comentario. Por favor, inténtalo de nuevo.'
+                    });
+                }
+            });
+        }
+    });
+
+    // Funcionalidad para botones "Ver más" / "Ver menos"
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('btn-ver-mas')) {
+            const button = e.target;
+            const action = button.getAttribute('data-action');
+            const container = button.closest('.expandable');
+            
+            if (action === 'expand') {
+                // Mostrar contenido completo
+                container.querySelector('.content-preview').style.display = 'none';
+                container.querySelector('.content-full').style.display = 'block';
+                button.textContent = 'Ver menos';
+                button.setAttribute('data-action', 'collapse');
+            } else {
+                // Colapsar contenido
+                container.querySelector('.content-preview').style.display = 'block';
+                container.querySelector('.content-full').style.display = 'none';
+                button.textContent = 'Ver más';
+                button.setAttribute('data-action', 'expand');
+            }
+        }
+    });
+
+    // Manejo de imágenes en el modal
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.carousel-item img')) {
+            const img = e.target.closest('.carousel-item img');
+            const imgSrc = img.dataset.imgSrc || img.getAttribute('src');
+            
+            // Abrir la imagen en el modal
+            const modal = document.querySelector('#imageModal');
+            if (modal) {
+                const modalImg = modal.querySelector('.full-image');
+                modalImg.setAttribute('src', imgSrc);
+                
+                // Usar Bootstrap para mostrar el modal
+                const bsModal = new bootstrap.Modal(modal);
+                bsModal.show();
+            }
+        }
+    });
+});
+</script>
+
+<!-- Modal para visualizar imágenes -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageModalLabel">Imagen adjunta</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img src="" class="img-fluid full-image" alt="Imagen a tamaño completo">
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php
+$script = <<<JS
+    // Variables globales para los límites
+    let maxChars = 480; // Valor predeterminado
+    let csrfParam = "{$csrfParam}"; // Nombre del parámetro CSRF
+
+    // Función para verificar la suscripción y permisos del usuario
+    function checkUserSubscription() {
+        $.ajax({
+            url: '$checkSubscriptionUrl',
+            type: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    // Mostrar información de depuración en la consola
+                    console.log('Respuesta completa de suscripción:', response);
+                    if (response.debug) {
+                        console.log('Información de depuración:', response.debug);
+                    }
+                    
+                    // Actualizar límites con los valores del servidor
+                    maxChars = response.maxChars || 480;
+                    
+                    // Actualizar maxlength de todos los textareas
+                    $('textarea[name="contenido"]').attr('maxlength', maxChars);
+                    
+                    // Actualizar contadores existentes
+                    $('textarea[name="contenido"]').each(function() {
+                        var textarea = $(this);
+                        var counter = textarea.next('.character-count');
+                        if (counter.length) {
+                            var currentLength = textarea.val().length;
+                            counter.text(currentLength + '/' + maxChars + ' caracteres');
+                        }
+                    });
+                } else {
+                    console.error('Error al verificar suscripción:', response.message);
+                    if (response.debug) {
+                        console.error('Detalles del error:', response.debug);
+                    }
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error al conectar con el servidor:', status, error);
+                console.error('Respuesta:', xhr.responseText);
+            }
+        });
+    }
+    
+    // Verificar suscripción al cargar la página
+    $(document).ready(function() {
+        checkUserSubscription();
+    });
+
+    // Contador de caracteres para textareas
+    $(document).on('input', 'textarea', function() {
+        var textarea = $(this);
+        var counter = textarea.next('.character-count');
+        if (counter.length) {
+            var maxLength = textarea.attr('maxlength') || maxChars;
+            var currentLength = textarea.val().length;
+            
+            counter.text(currentLength + '/' + maxLength + ' caracteres');
+            
+            // Actualizar color según el número de caracteres
+            counter.css('color', '#6c757d'); // Color por defecto
+            if (currentLength >= maxLength * 0.9) {
+                counter.css('color', '#ffc107'); // Amarillo (advertencia)
+            }
+            if (currentLength >= maxLength * 0.98) {
+                counter.css('color', '#dc3545'); // Rojo (peligro)
+            }
+        }
+    });
+    
+    // Manejo de formularios de comentarios
+    $(document).on('click', '.reply-button', function() {
+        var postId = $(this).data('post-id');
+        var formContainer = $('#form-comment-' + postId);
+        
+        if (formContainer.is(':visible')) {
+            formContainer.slideUp();
+        } else {
+            // Ocultar otros formularios
+            $('.comment-form-container').slideUp();
+            formContainer.slideDown();
+            
+            // Inicializar contador de caracteres
+            var textarea = formContainer.find('textarea');
+            var counter = formContainer.find('.character-count');
+            if (textarea.length && counter.length) {
+                counter.text('0/' + (textarea.attr('maxlength') || 480) + ' caracteres');
+            }
+        }
+    });
+    
+    // Cancelar comentario
+    $(document).on('click', '.cancel-comment', function() {
+        var form = $(this).closest('form');
+        form[0].reset();
+        form.closest('.comment-form-container').slideUp();
+    });
+    
+    // Envío de formularios de comentarios
+    $(document).on('submit', '.comment-form', function(e) {
+        e.preventDefault();
+        var form = $(this);
+        var textarea = form.find('textarea[name="contenido"]');
+        var contenido = textarea.val().trim();
+        
+        if (!contenido) {
+            textarea.addClass('is-invalid');
+            Swal.fire({
+                icon: 'warning',
+                title: 'Campo requerido',
+                text: 'El contenido del comentario no puede estar vacío'
+            });
+            return;
+        }
+        
+        // Verificar límite de caracteres según suscripción
+        if (contenido.length > maxChars) {
+            textarea.addClass('is-invalid');
+            Swal.fire({
+                icon: 'warning',
+                title: 'Límite excedido',
+                text: 'El contenido no puede exceder los ' + maxChars + ' caracteres con tu suscripción actual.'
+            });
+            return;
+        }
+        
+        // Obtener el ID del padre
+        var padreIdInput = form.find('input[name="padre_id"]');
+        if (padreIdInput.length === 0 || !padreIdInput.val()) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Falta el ID del post o comentario padre'
+            });
+            return;
+        }
+        
+        // Deshabilitar botón de envío y mostrar indicador de carga
+        var submitBtn = form.find('button[type="submit"]');
+        var originalText = submitBtn.html();
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Enviando...');
+        
+        // Crear FormData manualmente con los campos exactos que necesitamos
+        var formData = new FormData();
+        
+        // Añadir CSRF token
+        var csrfToken = form.find('input[name="' + csrfParam + '"]');
+        if (csrfToken.length > 0) {
+            formData.append(csrfToken.attr('name'), csrfToken.val());
+        }
+        
+        // Añadir campos principales
+        formData.append('padre_id', padreIdInput.val());
+        formData.append('contenido', contenido);
+        
+        // Añadir campos opcionales si existen
+        var ageInput = form.find('input[name="age"]');
+        if (ageInput.length > 0 && ageInput.val()) {
+            formData.append('age', ageInput.val());
+        }
+        
+        var genreSelect = form.find('select[name="genre"]');
+        if (genreSelect.length > 0) {
+            formData.append('genre', genreSelect.val());
+        }
+        
+        $.ajax({
+            url: form.attr('action'),
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                submitBtn.prop('disabled', false).html(originalText);
+                
+                if (response.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Éxito!',
+                        text: response.message,
+                        showConfirmButton: false,
+                        timer: 1500
+                    }).then(function() {
+                        // Ocultar formulario y recargar
+                        form[0].reset();
+                        form.closest('.comment-form-container').slideUp();
+                        window.location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: response.message || 'Error al procesar la solicitud'
+                    });
+                    
+                    if (response.redirect) {
+                        setTimeout(function() {
+                            window.location.href = response.redirect;
+                        }, 1500);
+                    }
+                }
+            },
+            error: function() {
+                submitBtn.prop('disabled', false).html(originalText);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Ocurrió un error al enviar el comentario. Por favor, inténtalo de nuevo.'
+                });
+            }
+        });
+    });
+
+    // Cargar más posts al hacer scroll
+    $(window).scroll(function() {
+        var scrollHeight = $(document).height();
+        var scrollPosition = $(window).height() + $(window).scrollTop();
+        
+        // Si estamos cerca del final, cargar más posts automáticamente
+        if ((scrollHeight - scrollPosition) / scrollHeight === 0) {
+            $('#load-more').click();
+        }
+    });
+    
+    // Botón para cargar más posts
+    $('#load-more').on('click', function() {
+        var btn = $(this);
+        var page = btn.data('page');
+        
+        btn.html('<i class="fas fa-spinner fa-spin"></i> Cargando...').prop('disabled', true);
+        
+        $.ajax({
+            url: yii.getUrlManagerBaseUrl() + '/site/load-more-posts',
+            type: 'GET',
+            data: {page: page},
+            success: function(response) {
+                if (response.success) {
+                    $('#posts-container').append(response.html);
+                    
+                    if (response.hasMore) {
+                        btn.data('page', page + 1).html('<i class="fas fa-sync"></i> Cargar más').prop('disabled', false);
+                    } else {
+                        btn.remove();
+                    }
+                } else {
+                    btn.html('<i class="fas fa-times"></i> ' + response.message).addClass('btn-outline-danger');
+                    setTimeout(function() {
+                        btn.html('<i class="fas fa-sync"></i> Reintentar').removeClass('btn-outline-danger').prop('disabled', false);
+                    }, 3000);
+                }
+            },
+            error: function() {
+                btn.html('<i class="fas fa-times"></i> Error al cargar').addClass('btn-outline-danger');
+                setTimeout(function() {
+                    btn.html('<i class="fas fa-sync"></i> Reintentar').removeClass('btn-outline-danger').prop('disabled', false);
+                }, 3000);
+            }
+        });
+    });
+    
+    // Like y dislike buttons
+    $(document).on('click', '.like-button', function() {
+        var btn = $(this);
+        var postId = btn.data('post-id');
+        
+        // Determinar si es un comentario o un post
+        var isComment = btn.closest('.forum-comment').length > 0;
+        var elementType = isComment ? '.forum-comment' : '.forum-post';
+        var element = btn.closest(elementType);
+        
+        // URL para la acción AJAX
+        var url = isComment 
+            ? yii.getUrlManagerBaseUrl() + '/site/like-comment'
+            : yii.getUrlManagerBaseUrl() + '/site/like';
+        
+        // Encontrar el contador
+        var countElement = element.find('.post-stats .stat-item:first-child');
+        
+        // Cambio visual para confirmar la acción
+        btn.addClass('active');
+        
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: {id: postId},
+            success: function(response) {
+                if (response.success) {
+                    // Actualizar el contador visual
+                    if (countElement.length) {
+                        countElement.html('<i class="far fa-thumbs-up"></i> ' + response.count);
+                    }
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: response.message || 'Error al procesar la solicitud'
+                    });
+                }
+                
+                // Quitar clase active después de un tiempo
+                setTimeout(function() {
+                    btn.removeClass('active');
+                }, 500);
+            },
+            error: function() {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Ocurrió un error al procesar tu solicitud'
+                });
+                btn.removeClass('active');
+            }
+        });
+    });
+    
+    $(document).on('click', '.dislike-button', function() {
+        var btn = $(this);
+        var postId = btn.data('post-id');
+        
+        // Determinar si es un comentario o un post
+        var isComment = btn.closest('.forum-comment').length > 0;
+        var elementType = isComment ? '.forum-comment' : '.forum-post';
+        var element = btn.closest(elementType);
+        
+        // URL para la acción AJAX
+        var url = isComment 
+            ? yii.getUrlManagerBaseUrl() + '/site/dislike-comment'
+            : yii.getUrlManagerBaseUrl() + '/site/dislike';
+        
+        // Encontrar el contador
+        var countElement = element.find('.post-stats .stat-item:nth-child(2)');
+        
+        // Cambio visual para confirmar la acción
+        btn.addClass('active');
+        
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: {id: postId},
+            success: function(response) {
+                if (response.success) {
+                    // Actualizar el contador visual
+                    if (countElement.length) {
+                        countElement.html('<i class="far fa-thumbs-down"></i> ' + response.count);
+                    }
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: response.message || 'Error al procesar la solicitud'
+                    });
+                }
+                
+                // Quitar clase active después de un tiempo
+                setTimeout(function() {
+                    btn.removeClass('active');
+                }, 500);
+            },
+            error: function() {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Ocurrió un error al procesar tu solicitud'
+                });
+                btn.removeClass('active');
+            }
+        });
+    });
+    
+    // Manejo de imágenes en el modal
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.carousel-item img')) {
+            const img = e.target.closest('.carousel-item img');
+            const imgSrc = img.dataset.imgSrc || img.getAttribute('src');
+            
+            // Abrir la imagen en el modal
+            const modal = document.querySelector('#imageModal');
+            if (modal) {
+                const modalImg = modal.querySelector('.full-image');
+                modalImg.setAttribute('src', imgSrc);
+                
+                // Usar Bootstrap para mostrar el modal
+                const bsModal = new bootstrap.Modal(modal);
+                bsModal.show();
+            }
+        }
+    });
+JS;
+$this->registerJs($script);
+?>

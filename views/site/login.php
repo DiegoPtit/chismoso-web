@@ -1,5 +1,4 @@
 <?php
-
 /** @var yii\web\View $this */
 /** @var yii\bootstrap5\ActiveForm $form */
 /** @var app\models\LoginForm $model */
@@ -9,68 +8,94 @@ use yii\bootstrap5\Html;
 use yii\bootstrap5\Modal;
 use app\models\Usuarios;
 
-$this->title = 'Iniciar Sesión';
-$this->params['breadcrumbs'][] = $this->title;
+$this->title = 'El Chismoso - Iniciar Sesión';
 ?>
+
 <div class="site-login">
-    <h1><?= Html::encode($this->title) ?></h1>
+    <div class="body-content">
+        <h1 class="text-center mb-4"><i class="fas fa-comments"></i> El Chismoso</h1>
+        <p class="lead text-center mb-4">Inicia sesión para participar en el foro</p>
 
-    <p>Por favor complete los siguientes campos para ingresar:</p>
+        <div class="row">
+            <div class="col-lg-6 mx-auto">
+                <div class="forum-container">
+                    <div class="forum-post">
+                        <div class="forum-post-header">
+                            <div class="avatar user-neutral">
+                                <i class="fas fa-sign-in-alt"></i>
+                            </div>
+                            <div class="post-info">
+                                <span class="username">Iniciar Sesión</span>
+                                <span class="post-date">
+                                    <i class="far fa-user"></i> Acceso a usuarios registrados
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="forum-post-content login-content">
+                            <?php $form = ActiveForm::begin([
+                                'id' => 'login-form',
+                                'layout' => 'default',
+                                'fieldConfig' => [
+                                    'template' => "{label}\n{input}\n{error}",
+                                    'labelOptions' => ['class' => 'form-label'],
+                                    'inputOptions' => ['class' => 'form-control mb-3'],
+                                    'errorOptions' => ['class' => 'invalid-feedback'],
+                                ],
+                            ]); ?>
 
-    <div class="row">
-        <div class="col-lg-5">
+                            <?= $form->field($model, 'username')->textInput(['autofocus' => true, 'placeholder' => 'Nombre de usuario']) ?>
 
-            <?php $form = ActiveForm::begin([
-                'id' => 'login-form',
-                'fieldConfig' => [
-                    'template' => "{label}\n{input}\n{error}",
-                    'labelOptions' => ['class' => 'col-lg-1 col-form-label mr-lg-3'],
-                    'inputOptions' => ['class' => 'col-lg-3 form-control'],
-                    'errorOptions' => ['class' => 'col-lg-7 invalid-feedback'],
-                ],
-            ]); ?>
+                            <?= $form->field($model, 'password')->passwordInput(['placeholder' => 'Contraseña']) ?>
 
-            <?= $form->field($model, 'username')->textInput(['autofocus' => true]) ?>
+                            <?= $form->field($model, 'rememberMe')->checkbox([
+                                'template' => "<div class=\"form-check mb-3\">{input} {label}</div>\n{error}",
+                                'class' => 'form-check-input',
+                                'labelOptions' => ['class' => 'form-check-label'],
+                            ]) ?>
 
-            <?= $form->field($model, 'password')->passwordInput() ?>
+                            <div class="form-group mb-3">
+                                <?= Html::submitButton('Iniciar Sesión', ['class' => 'btn btn-primary w-100', 'name' => 'login-button']) ?>
+                            </div>
 
-            <?= $form->field($model, 'rememberMe')->checkbox([
-                'template' => "<div class=\"custom-control custom-checkbox\">{input} {label}</div>\n<div class=\"col-lg-8\">{error}</div>",
-            ]) ?>
-
-            <div class="form-group">
-                <div>
-                    <?= Html::submitButton('Ingresar', ['class' => 'btn btn-primary', 'name' => 'login-button']) ?>
-                    <?= Html::button('Registrarse', ['class' => 'btn btn-success', 'data-bs-toggle' => 'modal', 'data-bs-target' => '#registroModal']) ?>
+                            <?php ActiveForm::end(); ?>
+                        </div>
+                        
+                        <div class="forum-post-actions justify-content-center">
+                            <button type="button" class="btn-forum" data-bs-toggle="modal" data-bs-target="#registroModal">
+                                <i class="fas fa-user-plus"></i> Registrarse
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
-
-            <?php ActiveForm::end(); ?>
-
         </div>
     </div>
 </div>
 
 <?php Modal::begin([
     'id' => 'registroModal',
-    'title' => '<h4>Registro de Usuario</h4>',
+    'title' => '<h4><i class="fas fa-user-plus"></i> Registro de Usuario</h4>',
+    'options' => ['class' => 'modal fade'],
+    'bodyOptions' => ['class' => 'p-4'],
+    'headerOptions' => ['class' => 'modal-header bg-primary'],
 ]); ?>
 
-<?php $form = ActiveForm::begin([
+<?php $formRegistro = ActiveForm::begin([
     'id' => 'registro-form',
     'action' => ['site/register'],
 ]); ?>
 
 <?php $modelRegistro = new Usuarios(); ?>
 
-<?= $form->field($modelRegistro, 'user')->textInput(['maxlength' => true]) ?>
+<?= $formRegistro->field($modelRegistro, 'user')->textInput(['maxlength' => true, 'class' => 'form-control mb-3'])->label('Nombre de usuario') ?>
 
-<?= $form->field($modelRegistro, 'pwd')->passwordInput(['maxlength' => true]) ?>
+<?= $formRegistro->field($modelRegistro, 'pwd')->passwordInput(['maxlength' => true, 'class' => 'form-control mb-3'])->label('Contraseña') ?>
 
-<?= $form->field($modelRegistro, 'birthday')->input('date') ?>
+<?= $formRegistro->field($modelRegistro, 'birthday')->input('date', ['class' => 'form-control mb-3'])->label('Fecha de nacimiento') ?>
 
 <div class="form-group">
-    <?= Html::submitButton('Registrar', ['class' => 'btn btn-primary']) ?>
+    <?= Html::submitButton('Registrar', ['class' => 'btn btn-primary w-100']) ?>
 </div>
 
 <?php ActiveForm::end(); ?>
@@ -78,135 +103,185 @@ $this->params['breadcrumbs'][] = $this->title;
 <?php Modal::end(); ?>
 
 <style>
-/* Estilos base para el modal y backdrop */
-.modal-backdrop {
-    position: fixed !important;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: transparent !important;
-    z-index: 1040 !important;
-    pointer-events: none !important;
+/* Importar estilos comunes del foro */
+.forum-container {
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    border: 1px solid #e0e0e0;
+    margin-bottom: 30px;
 }
 
-.modal {
-    z-index: 1050 !important;
-    padding-top: 80px !important;
-}
-
-.modal-dialog {
-    z-index: 1051 !important;
-}
-
-.modal-content {
-    z-index: 1052 !important;
-    position: relative;
+.forum-post {
+    padding: 20px;
     background-color: #fff;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.forum-post-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+    color: white;
+    flex-shrink: 0;
+    font-size: 1.2rem;
+}
+
+.avatar.user-neutral {
+    background-color: #6c5ce7;
+}
+
+.post-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.username {
+    font-weight: 600;
+    color: #444;
+    font-size: 1.1rem;
+}
+
+.post-date {
+    color: #777;
+    font-size: 0.9rem;
+}
+
+.forum-post-content {
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.forum-post-content.login-content {
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    border: 1px solid #e9ecef;
+}
+
+.forum-post-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.justify-content-center {
+    justify-content: center;
+}
+
+.btn-forum {
+    border: none;
+    background: #f1f1f1;
+    color: #555;
+    padding: 8px 15px;
+    border-radius: 3px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-forum:hover {
+    background: #6c5ce7;
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* Estilos para formularios */
+.form-control {
+    border-radius: 5px;
+    padding: 12px;
+    border: 1px solid #ced4da;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: #6c5ce7;
+    box-shadow: 0 0 0 0.2rem rgba(108, 92, 231, 0.25);
+}
+
+.form-label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: #495057;
+}
+
+.form-check-input {
+    margin-top: 0.2rem;
+}
+
+.btn {
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background-color: #6c5ce7;
+    border-color: #6c5ce7;
+}
+
+.btn-primary:hover {
+    background-color: #5f4dd0;
+    border-color: #5f4dd0;
+    transform: translateY(-2px);
+}
+
+/* Estilos para el modal */
+.modal-content {
+    border: none;
     border-radius: 15px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    overflow: hidden;
 }
 
-/* Asegurar que el backdrop no interfiera con los clics */
-.modal-backdrop.show {
-    pointer-events: none !important;
-    background-color: transparent !important;
+.modal-header {
+    border-bottom: none;
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+    padding: 1.25rem;
 }
 
-/* Hacer que el contenido del modal sea clickeable */
-.modal, .modal-dialog, .modal-content {
-    pointer-events: auto !important;
+.modal-header h4 {
+    color: white;
+    margin: 0;
+    font-size: 1.25rem;
 }
 
-/* Animaciones */
-.modal.fade .modal-dialog {
-    transform: scale(0.8);
-    transition: transform 0.3s ease-in-out;
+.bg-primary {
+    background-color: #6c5ce7 !important;
 }
 
-.modal.show .modal-dialog {
-    transform: scale(1);
-}
-
-/* Asegurar que el modal esté por encima del backdrop */
-.modal.show {
-    z-index: 1050 !important;
-}
-
-.modal.show .modal-dialog {
-    z-index: 1051 !important;
-}
-
-.modal.show .modal-content {
-    z-index: 1052 !important;
-}
-
-/* Ajustes para móviles */
-@media (max-width: 767px) {
-    .modal {
-        padding-top: 60px !important;
+/* Estilos responsive */
+@media (max-width: 768px) {
+    .forum-post {
+        padding: 15px;
     }
     
-    .modal-dialog {
-        margin: 1rem;
-        max-width: calc(100% - 2rem);
+    .forum-post-header {
+        flex-direction: column;
+        align-items: flex-start;
     }
     
-    .modal-body {
-        padding: 1rem;
-        max-height: 80vh;
+    .avatar {
+        margin-bottom: 10px;
     }
     
-    .modal-header,
-    .modal-footer {
-        padding: 1rem;
+    .forum-post-actions {
+        flex-direction: column;
+    }
+    
+    .btn-forum, .btn {
+        width: 100%;
     }
 }
-</style>
-
-<?php
-$this->registerJs(<<<JS
-    $(document).ready(function() {
-        // Limpiar modales y backdrops al cargar la página
-        $('.modal-backdrop').remove();
-        $('body').removeClass('modal-open');
-        
-        // Asegurar que los modales sean clickeables
-        $('.modal').css('pointer-events', 'auto');
-        $('.modal .modal-content').css('pointer-events', 'auto');
-        
-        // Manejar clics en los modales
-        $('.modal').on('click', function(e) {
-            e.stopPropagation();
-        });
-        
-        // Manejar clics en el contenido de los modales
-        $('.modal .modal-content').on('click', function(e) {
-            e.stopPropagation();
-        });
-        
-        // Manejar la apertura de modales
-        $('.modal').on('show.bs.modal', function() {
-            // Remover cualquier backdrop existente
-            $('.modal-backdrop').remove();
-            
-            // Crear un nuevo backdrop transparente
-            $('<div>')
-                .addClass('modal-backdrop fade show')
-                .css({
-                    'z-index': '1040',
-                    'background-color': 'transparent',
-                    'pointer-events': 'none'
-                })
-                .appendTo('body');
-        });
-        
-        // Manejar el cierre de modales
-        $('.modal').on('hidden.bs.modal', function() {
-            $('.modal-backdrop').remove();
-            $('body').removeClass('modal-open');
-        });
-    });
-JS
-);
-?>
+</style> 

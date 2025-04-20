@@ -80,4 +80,47 @@ class BaseController extends Controller
         if (strpos($userAgent, 'iOS') !== false) return 'iOS';
         return 'Desconocido';
     }
+    
+    /**
+     * Determina si el dispositivo actual es móvil basado en el User Agent
+     * 
+     * @return boolean
+     */
+    protected function isMobile()
+    {
+        $userAgent = $_SERVER['HTTP_USER_AGENT'];
+        return (
+            strpos($userAgent, 'Android') !== false ||
+            strpos($userAgent, 'iPhone') !== false ||
+            strpos($userAgent, 'iPad') !== false ||
+            strpos($userAgent, 'Mobile') !== false ||
+            strpos($userAgent, 'webOS') !== false ||
+            strpos($userAgent, 'BlackBerry') !== false ||
+            strpos($userAgent, 'iPod') !== false ||
+            strpos($userAgent, 'Opera Mini') !== false
+        );
+    }
+    
+    /**
+     * Registra una acción en el log del sistema
+     * 
+     * @param string $accion Tipo de acción a registrar
+     * @param string $detalles Detalles adicionales de la acción
+     * @return boolean Si se guardó correctamente el log
+     */
+    protected function registrarLog($accion, $detalles = '')
+    {
+        $log = new Logs();
+        $ip = Yii::$app->request->userIP;
+        $log->ip = $ip;
+        $log->usuario_id = !Yii::$app->user->isGuest ? Yii::$app->user->id : null;
+        $log->ubicacion = $this->getLocationFromApi($ip);
+        $log->accion = $accion;
+        $log->details = $detalles;
+        $log->status = 1;
+        $userAgent = Yii::$app->request->getUserAgent();
+        $log->useragent = $userAgent;
+        $log->osver = $this->getOsFromUserAgent($userAgent);
+        return $log->save(false);
+    }
 }

@@ -11,6 +11,7 @@ use Yii;
  * @property int $receptor_id
  * @property int $post_original_id
  * @property int $comentario_id
+ * @property bool $leido Indica si la notificación ha sido leída
  * @property string|null $created_at
  *
  * @property Posts $comentario
@@ -37,6 +38,7 @@ class Notificaciones extends \yii\db\ActiveRecord
         return [
             [['receptor_id', 'post_original_id', 'comentario_id'], 'required'],
             [['receptor_id', 'post_original_id', 'comentario_id'], 'integer'],
+            [['leido'], 'boolean'],
             [['created_at'], 'safe'],
             [['receptor_id'], 'exist', 'skipOnError' => true, 'targetClass' => Usuarios::class, 'targetAttribute' => ['receptor_id' => 'id']],
             [['post_original_id'], 'exist', 'skipOnError' => true, 'targetClass' => Posts::class, 'targetAttribute' => ['post_original_id' => 'id']],
@@ -54,8 +56,24 @@ class Notificaciones extends \yii\db\ActiveRecord
             'receptor_id' => Yii::t('app', 'Receptor ID'),
             'post_original_id' => Yii::t('app', 'Post Original ID'),
             'comentario_id' => Yii::t('app', 'Comentario ID'),
+            'leido' => Yii::t('app', 'Leído'),
             'created_at' => Yii::t('app', 'Created At'),
         ];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function beforeSave($insert)
+    {
+        if (parent::beforeSave($insert)) {
+            // Si es una nueva notificación, establecer 'leido' como falso por defecto
+            if ($insert) {
+                $this->leido = false;
+            }
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -86,6 +104,15 @@ class Notificaciones extends \yii\db\ActiveRecord
     public function getReceptor()
     {
         return $this->hasOne(Usuarios::class, ['id' => 'receptor_id']);
+    }
+
+    /**
+     * Marcar una notificación como leída
+     */
+    public function marcarComoLeida()
+    {
+        $this->leido = true;
+        return $this->save(false);
     }
 
 }

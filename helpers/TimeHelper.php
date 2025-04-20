@@ -4,10 +4,14 @@ namespace app\helpers;
 
 class TimeHelper
 {
-    public static function getRelativeTime($datetime)
+    public static function getRelativeTime($datetime, $timezoneOffset = 0)
     {
         // Crear objeto DateTime con la zona horaria del servidor
         $datetime = new \DateTime($datetime, new \DateTimeZone(date_default_timezone_get()));
+        
+        // Ajustar la zona horaria
+        $datetime->modify($timezoneOffset . ' hours');
+        
         $now = new \DateTime('now', new \DateTimeZone(date_default_timezone_get()));
         
         $diff = $now->diff($datetime);

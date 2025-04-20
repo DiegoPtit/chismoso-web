@@ -22,6 +22,9 @@ $config = [
         'cache' => [
             'class' => 'yii\caching\FileCache',
         ],
+        'postsCache' => [
+            'class' => 'app\components\PostsCache',
+        ],
         'as logBehavior' => [
          'class' => 'app\components\LogBehavior',
         ],
@@ -54,6 +57,14 @@ $config = [
             'showScriptName' => false,
             'rules' => [
                 // Aquí puedes agregar reglas personalizadas si las necesitas
+                'mobile/like/<id:\d+>' => 'mobile/like',
+                'mobile/dislike/<id:\d+>' => 'mobile/dislike',
+                'mobile/create-post' => 'mobile/create-post',
+                'site/load-more-posts' => 'site/load-more-posts',
+                'site/createComment' => 'site/create-comment',
+                'site/comment' => 'site/comment',
+                'admin/cambiar-rol' => 'site/cambiar-rol',
+                'admin/eliminar-usuario' => 'site/eliminar-usuario',
             ],
         ],
         /*

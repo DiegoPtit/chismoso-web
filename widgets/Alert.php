@@ -32,18 +32,28 @@ class Alert extends \yii\bootstrap5\Widget
      * - value: the bootstrap alert type (i.e. danger, success, info, warning)
      */
     public $alertTypes = [
-        'error'   => 'alert-danger',
-        'danger'  => 'alert-danger',
-        'success' => 'alert-success',
-        'info'    => 'alert-info',
-        'warning' => 'alert-warning'
+        'error'   => 'text-danger',
+        'danger'  => 'text-danger',
+        'success' => 'text-success',
+        'info'    => 'text-info',
+        'warning' => 'text-warning'
     ];
+
+    /**
+     * @var array header icons for each type of alert
+     */
+    public $iconTypes = [
+        'error'   => '<i class="fas fa-exclamation-circle me-2"></i>',
+        'danger'  => '<i class="fas fa-exclamation-circle me-2"></i>',
+        'success' => '<i class="fas fa-check-circle me-2"></i>',
+        'info'    => '<i class="fas fa-info-circle me-2"></i>',
+        'warning' => '<i class="fas fa-exclamation-triangle me-2"></i>'
+    ];
+
     /**
      * @var array the options for rendering the close button tag.
-     * Array will be passed to [[\yii\bootstrap\Alert::closeButton]].
      */
     public $closeButton = [];
-
 
     /**
      * {@inheritdoc}
@@ -51,23 +61,57 @@ class Alert extends \yii\bootstrap5\Widget
     public function run()
     {
         $session = Yii::$app->session;
-        $appendClass = isset($this->options['class']) ? ' ' . $this->options['class'] : '';
+        $flashes = [];
+        $js = '';
 
         foreach (array_keys($this->alertTypes) as $type) {
             $flash = $session->getFlash($type);
-
-            foreach ((array) $flash as $i => $message) {
-                echo \yii\bootstrap5\Alert::widget([
-                    'body' => $message,
-                    'closeButton' => $this->closeButton,
-                    'options' => array_merge($this->options, [
-                        'id' => $this->getId() . '-' . $type . '-' . $i,
-                        'class' => $this->alertTypes[$type] . $appendClass,
-                    ]),
-                ]);
+            if (!empty($flash)) {
+                foreach ((array) $flash as $i => $message) {
+                    $modalId = $this->getId() . '-' . $type . '-' . $i;
+                    $flashes[] = [
+                        'type' => $type,
+                        'message' => $message,
+                        'modalId' => $modalId
+                    ];
+                    
+                    // Generar el modal
+                    echo '
+                    <div class="modal fade" id="' . $modalId . '" tabindex="-1" aria-labelledby="' . $modalId . 'Label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title ' . $this->alertTypes[$type] . '" id="' . $modalId . 'Label">' . 
+                                        $this->iconTypes[$type] . 
+                                        ucfirst(str_replace(['danger', 'error'], 'error', $type)) . 
+                                    '</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                                </div>
+                                <div class="modal-body">
+                                    ' . $message . '
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Aceptar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>';
+                    
+                    // JavaScript para mostrar el modal automáticamente
+                    $js .= "
+                    document.addEventListener('DOMContentLoaded', function() {
+                        var alertModal = new bootstrap.Modal(document.getElementById('" . $modalId . "'));
+                        alertModal.show();
+                    });";
+                }
+                $session->removeFlash($type);
             }
-
-            $session->removeFlash($type);
+        }
+        
+        // Registrar el JavaScript si hay flashes
+        if (!empty($flashes)) {
+            $view = $this->getView();
+            $view->registerJs($js);
         }
     }
 }
